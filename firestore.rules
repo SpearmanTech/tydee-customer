@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /profileImages/{userId}.jpg {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+match /professionals/{userId} {
+  allow read, write: if request.auth != null
+    && request.auth.uid == userId;
+}
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // USERS — MUST COME FIRST
+    match /users/{userId} {
+      allow read, write: if isAuthenticated()
+        && request.auth.uid == userId;
+    }
+
+    // PROFESSIONALS
+    match /professionals/{userId} {
+      allow read, write: if isAuthenticated()
+        && request.auth.uid == userId;
+    }
+
+    // JOBS (simplified, safe)
+    match /jobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // BIDS
+    match /bids/{bidId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // BOOKINGS
+    match /bookings/{bookingId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

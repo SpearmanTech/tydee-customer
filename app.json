@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Tydee",
+    "slug": "tydee",
+    "version": "1.0.0",
+    "projectId": "cff17f73-4614-49ef-b229-bb58401bcc55", // ADD THIS LINE HERE
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "platforms": ["ios", "android", "web"],
+    "scheme": "tydee",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "notification": {
+      "icon": "./assets/images/icon.png",
+      "color": "#ffffff",
+      "iosDisplayInForeground": true,
+      "androidMode": "default"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "cff17f73-4614-49ef-b229-bb58401bcc55"
+      }
+    }
+  }
+}

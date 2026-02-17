@@ -1,0 +1,63 @@
+type User @table {
+  displayName: String!
+  userType: String! # Enum: Customer, Professional
+  createdAt: Timestamp!
+  email: String
+  phoneNumber: String
+  photoUrl: String
+  description: String
+}
+
+type Job @table {
+  title: String!
+  description: String!
+  location: String! # Or consider `latitude: Float`, `longitude: Float`
+  requestedCompletionDate: Timestamp!
+  budget: Float!
+  status: String! # Enum: Open, Booked, Expired, Cancelled
+  createdAt: Timestamp!
+  expiresAt: Timestamp!
+  category: String
+  customer: User!
+}
+
+type Bid @table {
+  bidAmount: Float!
+  status: String! # Enum: Pending, Accepted, Rejected
+  createdAt: Timestamp!
+  message: String
+  professional: User!
+  job: Job!
+}
+
+type Booking @table {
+  bookingDate: Timestamp!
+  scheduledServiceDate: Timestamp!
+  status: String! # Enum: Confirmed, Completed, Cancelled
+  customerNotes: String
+  professionalNotes: String
+  job: Job!
+  bid: Bid!
+  customer: User!
+  professional: User!
+}
+
+type Review @table {
+  rating: Int!
+  reviewText: String!
+  createdAt: Timestamp!
+  booking: Booking!
+  reviewer: User!
+  reviewee: User!
+}
+
+professionals/{uid} {
+  uid: string
+  name: string
+  services: string[]
+  serviceRadiusKm: number
+  profileImageUrl: string | null
+  status: "active" | "inactive"
+  onboardingCompleted: boolean
+  createdAt: Timestamp
+}
