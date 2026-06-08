@@ -1,23 +1,29 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-
-const functions = getFunctions();
+// ❌ REMOVE: import { getFunctions, httpsCallable } from 'firebase/functions';
+// ✅ ADD: Import your logic directly from the files they live in
+import { verifyAndSaveCard, chargeSavedCard as chargeFunc } from "../payments/paystack";
 
 export const paymentService = {
   /**
-   * Links a card by verifying the reference from Paystack
+   * Links a card by calling the local function logic directly
    */
   linkCard: async (userId: string, reference: string) => {
-    const verifyFunc = httpsCallable(functions, 'verifyAndSaveCard');
-    const result = await verifyFunc({ userId, reference });
-    return result.data;
+    // Instead of httpsCallable, we just call the function logic
+    // We mock the 'data' structure to match what the function expects
+    const result = await verifyAndSaveCard.run({ 
+      data: { userId, reference } 
+    } as any);
+    
+    return result;
   },
 
   /**
-   * Charges a saved card in the background (The Uber Moment)
+   * Charges a saved card directly
    */
   chargeSavedCard: async (userId: string, amount: number, jobId: string) => {
-    const chargeFunc = httpsCallable(functions, 'chargeSavedCard');
-    const result = await chargeFunc({ userId, amount, jobId });
-    return result.data;
+    const result = await chargeFunc.run({ 
+      data: { userId, amount, jobId } 
+    } as any);
+    
+    return result;
   }
 };

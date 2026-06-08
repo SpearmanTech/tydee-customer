@@ -1,35 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { db } from '@/firebase/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { CheckCircle, MapPin, User, ShieldCheck } from 'lucide-react-native';
 import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
-import { paymentService } from "@/services/paymentService"
+import { paymentService } from "../services/paymentService";
+import { useAuth } from "../../context/AuthContext"; // Ensure correct import for useAuth
 
 export default function BookingConfirmation() {
   const { jobId } = useLocalSearchParams();
-  const { user } = useAuth(); // Get the current logged-in user
+  const router = useRouter();
+  const { user } = useAuth(); 
   const [jobData, setJobData] = useState<any>(null);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
 
   useEffect(() => {
     const processInitialCharge = async (data: any) => {
-      // Only charge if the job is paid via card and hasn't been charged yet
-      if (data.status === "confirmed" && !data.isPaid) {
+      // Only charge if the job is confirmed and hasn't been paid/charged yet
+      if (data.status === "confirmed" && !data.isPaid && user) {
         setPaymentProcessing(true);
         try {
+          // Calling the refined v2 function logic via your paymentService
           const result = await paymentService.chargeSavedCard(
-            user!.uid,
+            user.uid,
             data.accepted_bid_details?.amount,
             jobId as string
           );
           
-          if (result.status === 'success') {
-             // Optional: Update local state or show a "Payment Successful" toast
-             console.log("Background charge successful");
+          if (result.success) {
+             console.log("Background charge initiated successfully");
+             // Note: The Webhook we built will handle updating 'isPaid' to true in Firestore
           }
         } catch (error) {
+          console.error("Payment Error:", error);
           Alert.alert("Payment Issue", "We couldn't process the automatic payment. Please check your saved card.");
         } finally {
           setPaymentProcessing(false);
@@ -47,7 +51,7 @@ export default function BookingConfirmation() {
       }
     };
     fetchJob();
-  }, [jobId]);
+  }, [jobId, user]); // Added user to dependency array
 
   if (!jobData) return null;
 
@@ -61,6 +65,9 @@ export default function BookingConfirmation() {
         </View>
         <Text style={styles.title}>Booking Confirmed!</Text>
         <Text style={styles.subtitle}>Your professional is on their way.</Text>
+        {paymentProcessing && (
+          <Text style={styles.processingText}>Securing payment...</Text>
+        )}
       </Animated.View>
 
       <View style={styles.content}>
@@ -114,6 +121,7 @@ const styles = StyleSheet.create({
   iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#ecfdf5', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 28, fontWeight: '900', color: '#1e293b' },
   subtitle: { fontSize: 16, color: '#64748b', marginTop: 8, textAlign: 'center' },
+  processingText: { fontSize: 12, color: '#6366f1', marginTop: 5, fontWeight: '600' },
   content: { flex: 1, padding: 25, gap: 20 },
   card: { backgroundColor: '#f8fafc', padding: 20, borderRadius: 24, borderWidth: 1, borderColor: '#f1f5f9' },
   pinCard: { backgroundColor: '#1e293b', padding: 30, borderRadius: 32, alignItems: 'center', gap: 10 },

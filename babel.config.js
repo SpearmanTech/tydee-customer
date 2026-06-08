@@ -6,12 +6,13 @@ module.exports = function (api) {
       [
         "module-resolver",
         {
+          root: ["./"], // Add this line
           alias: {
             "@": "./app",
           },
         },
       ],
-      "react-native-reanimated/plugin", // MUST be last
+      "react-native-reanimated/plugin",
     ],
   };
 };

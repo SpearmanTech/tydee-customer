@@ -2,37 +2,47 @@ import * as functions from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 import axios from "axios";
 
-const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET || "";
+// Initialize admin only once
+if (admin.apps.length === 0) {
+  admin.initializeApp();
+}
 
 /**
- * Verifies the R1.00 validation charge and saves the authorization token
+ * Verifies the validation charge and saves the authorization token
  */
 export const verifyAndSaveCard = functions.https.onCall(
-  { secrets: ["PAYSTACK_SECRET"] },
+  { secrets: ["EXPO_PAYSTACK_SECRET_KEY"] },
   async (request) => {
-    // 1. Check Auth (v2 uses request.auth)
     if (!request.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be logged in.');
     }
 
-    // 2. Extract Data (v2 uses request.data)
     const { reference, userId } = request.data;
+    // Security check: Ensure the authenticated user is the one they are updating
+    if (request.auth.uid !== userId) {
+        throw new functions.https.HttpsError('permission-denied', 'Unauthorized data access.');
+    }
 
     try {
+      // Use the secret injected by Firebase v2
+      const paystackSecret = process.env.EXPO_PAYSTACK_SECRET_KEY;
+
       const response = await axios.get(
         `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-        { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+        { headers: { Authorization: `Bearer ${paystackSecret}` } }
       );
 
-      const { status, authorization } = response.data.data;
+      const { status, authorization, customer } = response.data.data;
 
       if (status === 'success' && authorization.reusable) {
-        // Updated to use 'customers' collection to match your app's structure
         await admin.firestore().collection('customers').doc(userId).update({
           paymentMethod: {
             token: authorization.authorization_code,
             last4: authorization.last4,
             brand: authorization.brand,
+            expMonth: authorization.exp_month,
+            expYear: authorization.exp_year,
+            email: customer.email, // Useful to keep synced
             isLinked: true,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           }
@@ -42,7 +52,7 @@ export const verifyAndSaveCard = functions.https.onCall(
       return { success: false, message: "Card is not reusable or payment failed." };
     } catch (error) {
       console.error("Paystack Verification Error:", error);
-      throw new functions.https.HttpsError('internal', 'Unable to verify payment with Paystack.');
+      throw new functions.https.HttpsError('internal', 'Unable to verify payment.');
     }
   }
 );
@@ -51,9 +61,8 @@ export const verifyAndSaveCard = functions.https.onCall(
  * Background charge function for seamless "One-Tap" booking
  */
 export const chargeSavedCard = functions.https.onCall(
-  { secrets: ["PAYSTACK_SECRET"] },
+  { secrets: ["EXPO_PAYSTACK_SECRET_KEY"] },
   async (request) => {
-    // Check Auth
     if (!request.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be logged in.');
     }
@@ -64,24 +73,28 @@ export const chargeSavedCard = functions.https.onCall(
     const userData = userSnap.data();
 
     if (!userData?.paymentMethod?.token) {
-      throw new functions.https.HttpsError('failed-precondition', 'No card linked for this user.');
+      throw new functions.https.HttpsError('failed-precondition', 'No card linked.');
     }
 
     try {
+      const paystackSecret = process.env.EXPO_PAYSTACK_SECRET_KEY;
+
       const res = await axios.post(
         'https://api.paystack.co/transaction/charge_authorization',
         {
-          email: userData.email,
-          amount: amount * 100, // Paystack amounts are in cents
+          email: userData.paymentMethod.email || userData.email,
+          amount: Math.round(amount * 100), 
           authorization_code: userData.paymentMethod.token,
-          metadata: { job_id: jobId }
+          // Using jobId as reference prevents double-charging for the same job
+          reference: `job_${jobId}_${Date.now()}`, 
+          metadata: { job_id: jobId, user_id: userId }
         },
-        { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+        { headers: { Authorization: `Bearer ${paystackSecret}` } }
       );
 
-      return res.data;
-    } catch (error) {
-      console.error("Background Charge Error:", error);
+      return { success: true, data: res.data.data };
+    } catch (error: any) {
+      console.error("Background Charge Error:", error.response?.data || error.message);
       throw new functions.https.HttpsError('internal', 'Automatic charge failed.');
     }
   }

@@ -3,11 +3,12 @@ import { Drawer } from "expo-router/drawer";
 import { Dimensions, View, ActivityIndicator } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import CustomerDrawer from "./customerDrawer";
+import React from "react";
 
 const { width } = Dimensions.get("window");
 
 export default function CustomerLayout() {
-  const { user, role, loading } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -19,7 +20,6 @@ export default function CustomerLayout() {
 
   if (!user) return <Redirect href="/(auth)/login" />;
   
-  // Enforce customer-only domain
   return (
     <Drawer
       screenOptions={{
@@ -36,7 +36,9 @@ export default function CustomerLayout() {
       }}
       drawerContent={(props) => <CustomerDrawer {...props} />}
     >
-      {/* 1. This points to index.tsx in the (customer) root */}
+      {/* IMPORTANT: If you see "No route named index", 
+          ensure you have an index.tsx file in app/(customer)/ 
+      */}
       <Drawer.Screen 
         name="index" 
         options={{
@@ -44,7 +46,6 @@ export default function CustomerLayout() {
         }}
       />
 
-      {/* 2. This points to History.tsx in the (customer) root */}
       <Drawer.Screen 
         name="History" 
         options={{
@@ -52,7 +53,15 @@ export default function CustomerLayout() {
         }}
       />
 
-      {/* 3. This points to profile.tsx in the (customer) root */}
+      {/* Adding the Payment Screen to the Layout */}
+      <Drawer.Screen 
+        name="update-payment" 
+        options={{
+          drawerLabel: "Billing",
+          drawerItemStyle: { display: 'none' }, // Hides it from the menu, keeps it navigable
+        }}
+      />
+
       <Drawer.Screen 
         name="profile" 
         options={{
@@ -60,11 +69,10 @@ export default function CustomerLayout() {
         }}
       />
 
-      {/* 4. This handles all the utility screens inside your (stack) folder */}
       <Drawer.Screen 
         name="(stack)" 
         options={{
-          drawerItemStyle: { display: 'none' }, // Hides the stack folder from the sidebar menu
+          drawerItemStyle: { display: 'none' },
         }}
       />
     </Drawer>

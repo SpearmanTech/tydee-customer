@@ -3,7 +3,17 @@ import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
-import { User, CreditCard, Gift, ShieldCheck, HelpCircle, Info, LogOut } from "lucide-react-native";
+import { 
+  User, 
+  CreditCard, 
+  Gift, 
+  ShieldCheck, 
+  HelpCircle, 
+  Info, 
+  LogOut, 
+  Package, // Added for Rent
+  BadgePlus // Added for List
+} from "lucide-react-native";
 
 export default function CustomerDrawer(props: DrawerContentComponentProps) {
   const router = useRouter();
@@ -41,6 +51,7 @@ export default function CustomerDrawer(props: DrawerContentComponentProps) {
       </View>
 
       <View style={styles.mainContent}>
+        <Text style={styles.sectionLabel}>ACCOUNT</Text>
         <DrawerItem
           icon={<User size={20} color="#1e293b" />}
           label="Profile Details"
@@ -51,10 +62,27 @@ export default function CustomerDrawer(props: DrawerContentComponentProps) {
           label="Payments"
           onPress={() => router.push("/(customer)/(stack)/update-payment")}
         />
+
+        {/* NEW: EQUIPMENT MARKETPLACE SECTION */}
+        <View style={styles.separator} />
+        <Text style={styles.sectionLabel}>EQUIPMENT</Text>
+        <DrawerItem
+          icon={<Package size={20} color="#6366f1" />}
+          label="Rent Equipment"
+          onPress={() => router.push("/equipment/Rent/rent-equipment")}
+        />
+        <DrawerItem
+          icon={<BadgePlus size={20} color="#10b981" />}
+          label="List Your Gear"
+          onPress={() => router.push("/equipment/List/list-equipment")}
+        />
+
+        <View style={styles.separator} />
+        <Text style={styles.sectionLabel}>OTHERS</Text>
         <DrawerItem
           icon={<Gift size={20} color="#1e293b" />}
           label="Promotions"
-          onPress={() => {}} // Future logic
+          onPress={() => {}} 
         />
         <DrawerItem
           icon={<ShieldCheck size={20} color="#1e293b" />}
@@ -102,8 +130,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9'
   },
   avatarCircle: {
     width: 50,
@@ -117,11 +143,39 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1 },
   userName: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
   userEmail: { fontSize: 12, color: '#94a3b8', fontWeight: '500' },
-  mainContent: { flex: 1, paddingTop: 20, paddingHorizontal: 15 },
-  item: { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, marginBottom: 4 },
+  mainContent: { flex: 1, paddingHorizontal: 15 },
+  sectionLabel: { 
+    fontSize: 11, 
+    fontWeight: '800', 
+    color: '#94a3b8', 
+    letterSpacing: 1, 
+    marginLeft: 10, 
+    marginTop: 15, 
+    marginBottom: 8 
+  },
+  separator: { 
+    height: 1, 
+    backgroundColor: '#f1f5f9', 
+    marginHorizontal: 10, 
+    marginTop: 15 
+  },
+  item: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    paddingVertical: 12, 
+    paddingHorizontal: 10, 
+    borderRadius: 12, 
+    marginBottom: 4 
+  },
   iconBox: { width: 32, alignItems: 'center' },
   label: { fontSize: 15, color: "#475569", fontWeight: "600" },
-  footer: { paddingHorizontal: 25, paddingBottom: 40, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 20 },
+  footer: { 
+    paddingHorizontal: 25, 
+    paddingBottom: 40, 
+    borderTopWidth: 1, 
+    borderTopColor: '#f1f5f9', 
+    paddingTop: 20 
+  },
   signOutItem: { flexDirection: "row", alignItems: "center", gap: 12 },
   signOutLabel: { fontSize: 15, color: "#ef4444", fontWeight: "700" },
 });

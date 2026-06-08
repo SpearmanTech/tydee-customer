@@ -4,7 +4,7 @@ import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplet
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { collection, doc, getDoc, query, serverTimestamp, where } from "firebase/firestore";
 import { SafeAreaView, Platform, StatusBar } from "react-native";
-import AddCardModal from "../../../constants/AddCardModal"; // Create this file as discussed earlier
+import AddCardModal from "constants/AddCardModal"; // Create this file as discussed earlier
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useEffect, useState, useRef } from "react";
 import {
@@ -526,7 +526,7 @@ const handleSubmit = async () => {
                     });
                   }}
                   query={{
-                    piKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+                    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
                     language: 'en',
                     components: 'country:za', 
                   }}

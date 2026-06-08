@@ -24,12 +24,32 @@
         "firebase-debug.*.log",
         "*.local"
       ],
-      "predeploy": [
-        
-      ],
       "source": "functions"
     }    
   ],
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/equipment/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          },
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+          }
+        ]
+      }
+    ]
+  },
   "apphosting": {
     "backendId": "tydee-1",
     "rootDir": "/",
