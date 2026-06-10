@@ -30,6 +30,13 @@ export { createProRecipient } from "./professionals/createProRecipient";
 export { paymentService } from "./services/paymentService";
 export { setProfessionalOnline } from "./services/presence";
 export { generateThumbnail as onImageUpload } from "./equipments/onImageUpload";
+// Add these to your existing exports in index.ts
+export { onNewChatMessage } from "./notifications/chatPush";
+// Pro Equipment Logic
+export { processReturn } from "./equipments/return";
+
+// Pro Job Logic
+export { syncCustomerPinToJobs } from "./jobs/startpin"; // Adjust "startJobPin" to match your actual export name
 
 
 // 🚀 MILLIONS-OF-USERS SCALE: SHARD AGGREGATOR
