@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
+  sendEmailVerification, // <-- Add this
   signInWithCredential,
   User,
 } from "firebase/auth";
@@ -43,10 +44,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Android: Package name client from your app's credentials
 // Web:     Web client ID (also used as the Firebase OAuth client ID)
 // ─────────────────────────────────────────────────────────────────────────────
-const GOOGLE_EXPO_CLIENT_ID    = process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID;
-const GOOGLE_IOS_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_EXPO_CLIENT_ID    = "492837492837-asdfghjkl123456789.apps.googleusercontent.com";
+const GOOGLE_IOS_CLIENT_ID     = "492837492837-qwertyuiop123456.apps.googleusercontent.com";
+const GOOGLE_ANDROID_CLIENT_ID = "492837492837-zxcvbnm987654.apps.googleusercontent.com";
 
+// 🛡️ 1. The Gatekeeper Hook
 // 🛡️ 1. The Gatekeeper Hook
 export function useProtectedRoute(user: any, role: string | null, loading: boolean) {
   const segments = useSegments();
@@ -62,6 +64,19 @@ export function useProtectedRoute(user: any, role: string | null, loading: boole
         router.replace("/(auth)/register");
       }
     } else if (user) {
+      // 🔒 NEW: The Email Verification Blockade
+      // Check if they signed up with email/password instead of Google
+      const isEmailLogin = user.providerData?.some((p: any) => p.providerId === "password");
+      
+      if (isEmailLogin && !user.emailVerified) {
+        // If they are not already on the verify screen, force them there
+        if (segments[1] !== "verify-email") {
+          router.replace("/(auth)/verify-email");
+        }
+        return; // Abort further routing so they stay trapped here
+      }
+
+      // Allow verified users or Google users to proceed to the app
       if (inAuthGroup || segments.length === 0 || segments[0] === "index") {
         if (role === "customer") {
           router.replace("/(customer)");
@@ -138,11 +153,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signUp = async (email: string, password: string, selectedRole: Role = "customer") => {
+ const signUp = async (email: string, password: string, selectedRole: Role = "customer") => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
+      // ✉️ Send the verification email instantly
+      await sendEmailVerification(newUser);
+
+      // Create the global user document
       await setDoc(doc(db, "users", newUser.uid), {
         uid: newUser.uid,
         email: newUser.email,
@@ -151,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: serverTimestamp(),
       });
 
+      // Create the specific customer document
       if (selectedRole === "customer") {
         await setDoc(doc(db, "customers", newUser.uid), {
           uid: newUser.uid,
