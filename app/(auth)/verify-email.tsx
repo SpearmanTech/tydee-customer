@@ -18,7 +18,7 @@ export default function VerifyEmailScreen() {
   const [checking, setChecking] = useState(false);
   const [resending, setResending] = useState(false);
   const router = useRouter();
-
+const { user } = useAuth(); // <--- ADD THIS LINE BACK IN
   const checkVerification = async () => {
     const currentUser = auth.currentUser;
     
