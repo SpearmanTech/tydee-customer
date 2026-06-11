@@ -14,6 +14,7 @@ import {
   Package, // Added for Rent
   BadgePlus // Added for List
 } from "lucide-react-native";
+import React from "react";
 
 export default function CustomerDrawer(props: DrawerContentComponentProps) {
   const router = useRouter();
@@ -68,12 +69,12 @@ export default function CustomerDrawer(props: DrawerContentComponentProps) {
         <Text style={styles.sectionLabel}>EQUIPMENT</Text>
         <DrawerItem
           icon={<Package size={20} color="#6366f1" />}
-          label="Rent Equipment"
+          label="Manage Rentals"
           onPress={() => router.push("/equipment/Rent/rent-equipment")}
         />
         <DrawerItem
           icon={<BadgePlus size={20} color="#10b981" />}
-          label="List Your Gear"
+          label="Manage Listings"
           onPress={() => router.push("/equipment/List/list-equipment")}
         />
 

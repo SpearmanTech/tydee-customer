@@ -43,9 +43,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Android: Package name client from your app's credentials
 // Web:     Web client ID (also used as the Firebase OAuth client ID)
 // ─────────────────────────────────────────────────────────────────────────────
-const GOOGLE_EXPO_CLIENT_ID    = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com";
-const GOOGLE_IOS_CLIENT_ID     = "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com";
-const GOOGLE_ANDROID_CLIENT_ID = "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com";
+const GOOGLE_EXPO_CLIENT_ID    = process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 
 // 🛡️ 1. The Gatekeeper Hook
 export function useProtectedRoute(user: any, role: string | null, loading: boolean) {
