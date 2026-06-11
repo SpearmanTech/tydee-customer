@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Google OAuth session ──────────────────────────────────────────────────
   const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_EXPO_CLIENT_ID,
+    webClientId: GOOGLE_EXPO_CLIENT_ID, // Changed from clientId to webClientId
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
   });
