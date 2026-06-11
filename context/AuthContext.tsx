@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useRouter, useSegments } from "expo-router";
+import { useRouter, useSegments, useRootNavigationState } from "expo-router";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -52,7 +52,7 @@ const GOOGLE_ANDROID_CLIENT_ID = "492837492837-zxcvbnm987654.apps.googleusercont
 export function useProtectedRoute(user: any, role: string | null, loading: boolean) {
   const segments = useSegments();
   const router = useRouter();
-
+const rootNavigationState = useRootNavigationState(); // <-- Add this hook
   useEffect(() => {
     if (loading) return;
 

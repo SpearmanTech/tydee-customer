@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { reload, sendEmailVerification, signOut as firebaseSignOut } from "firebase/auth";
 import { CheckCircle2, LogOut, Mail } from "lucide-react-native";
 import React, { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import {
   ActivityIndicator,
   Alert,
