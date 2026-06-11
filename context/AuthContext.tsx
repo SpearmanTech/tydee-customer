@@ -49,7 +49,6 @@ const GOOGLE_IOS_CLIENT_ID     = "492837492837-qwertyuiop123456.apps.googleuserc
 const GOOGLE_ANDROID_CLIENT_ID = "492837492837-zxcvbnm987654.apps.googleusercontent.com";
 
 // 🛡️ 1. The Gatekeeper Hook
-// 🛡️ 1. The Gatekeeper Hook
 export function useProtectedRoute(user: any, role: string | null, loading: boolean) {
   const segments = useSegments();
   const router = useRouter();
@@ -58,25 +57,25 @@ export function useProtectedRoute(user: any, role: string | null, loading: boole
     if (loading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
+    const isVerifyScreen = segments[1] === "verify-email";
 
     if (!user) {
-      if (!inAuthGroup) {
+      // 🔒 FIX: If they sign out on the verify screen, force them back to register
+      if (!inAuthGroup || isVerifyScreen) {
         router.replace("/(auth)/register");
       }
     } else if (user) {
-      // 🔒 NEW: The Email Verification Blockade
-      // Check if they signed up with email/password instead of Google
       const isEmailLogin = user.providerData?.some((p: any) => p.providerId === "password");
       
+      // If they need to verify their email, trap them on the verify screen
       if (isEmailLogin && !user.emailVerified) {
-        // If they are not already on the verify screen, force them there
-        if (segments[1] !== "verify-email") {
+        if (!isVerifyScreen) {
           router.replace("/(auth)/verify-email");
         }
-        return; // Abort further routing so they stay trapped here
+        return; 
       }
 
-      // Allow verified users or Google users to proceed to the app
+      // If they ARE verified (or used Google), let them into the app
       if (inAuthGroup || segments.length === 0 || segments[0] === "index") {
         if (role === "customer") {
           router.replace("/(customer)");
@@ -85,7 +84,6 @@ export function useProtectedRoute(user: any, role: string | null, loading: boole
     }
   }, [user, role, loading, segments, router]);
 }
-
 // 🧠 2. The State Manager Provider
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

@@ -1,7 +1,7 @@
 import { auth } from "@/firebase/firebase";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { reload, sendEmailVerification } from "firebase/auth";
+import { reload, sendEmailVerification, signOut as firebaseSignOut } from "firebase/auth";
 import { CheckCircle2, LogOut, Mail } from "lucide-react-native";
 import React, { useState } from "react";
 import {
@@ -13,51 +13,54 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useAuth } from "../../context/AuthContext";
 
 export default function VerifyEmailScreen() {
   const [checking, setChecking] = useState(false);
   const [resending, setResending] = useState(false);
   const router = useRouter();
-  const { user, signOut } = useAuth();
 
   const checkVerification = async () => {
-    if (!user) return;
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      Alert.alert("Session Expired", "Please sign in again.");
+      router.replace("/(auth)/register");
+      return;
+    }
     
     setChecking(true);
     try {
-      await reload(user);
-      await user.getIdToken(true); // Force token refresh
+      await reload(currentUser);
+      await currentUser.getIdToken(true); // Force token refresh from server
 
-      if (user.emailVerified) {
-        Alert.alert("Success", "Your email is verified! Welcome to Tydee.");
-        // The gatekeeper in AuthContext will automatically route them to /(customer)
+      if (currentUser.emailVerified) {
+        Alert.alert("Success!", "Your email is verified. Welcome to Foona!");
+        // Force the router to move them instantly
+        router.replace("/(customer)"); 
       } else {
-        Alert.alert("Pending", "We haven't detected your verification yet. Please check your inbox and spam folder.");
+        Alert.alert("Pending", "Your email is not verified yet. Please check your inbox and spam folder.");
       }
     } catch (error: any) {
-      Alert.alert("Error", "Could not verify your status. Please try again.");
+      Alert.alert("Error", "Could not check verification status. Please try again.");
     } finally {
       setChecking(false);
     }
   };
 
   const handleResend = async () => {
-    if (!user) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      Alert.alert("Error", "No active session found.");
+      return;
+    }
     
     setResending(true);
     try {
-      await sendEmailVerification(user);
-      Alert.alert(
-        "Sent!",
-        "A new verification link has been sent to your inbox."
-      );
+      await sendEmailVerification(currentUser);
+      Alert.alert("Sent!", "A new verification link has been sent to your inbox.");
     } catch (error: any) {
       if (error.code === 'auth/too-many-requests') {
-        Alert.alert(
-          "Limit Reached",
-          "Please wait a moment before requesting another link."
-        );
+        Alert.alert("Limit Reached", "Please wait a minute before requesting another link.");
       } else {
         Alert.alert("Error", "Could not send the email.");
       }
@@ -66,7 +69,17 @@ export default function VerifyEmailScreen() {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await firebaseSignOut(auth);
+      // The gatekeeper in AuthContext will now automatically kick them to /register
+    } catch (error) {
+      Alert.alert("Error", "Failed to sign out.");
+    }
+  };
+
   return (
+    // ... KEEP YOUR EXISTING UI RETURN STATEMENT EXACTLY AS IT IS ...
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
