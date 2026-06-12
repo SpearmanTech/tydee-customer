@@ -29,6 +29,27 @@ const { width } = Dimensions.get('window');
 // Category List aligned with Tydee Service sectors
 const CATEGORIES = ['All', 'Power Tools', 'Cleaning', 'Gardening', 'Construction', 'Electrical'];
 
+// 🛑 THE BULLETPROOF URL FIXER
+const getValidImageUrl = (rawUrl: string | undefined | null) => {
+  const fallbackImage = 'https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=800'; // Reliable placeholder
+  if (!rawUrl) return fallbackImage;
+  
+  let url = rawUrl.trim();
+  
+  // Fix Firebase unencoded slash bug
+  if (url.includes('/o/') && !url.includes('%2F')) {
+     try {
+       const [baseUrl, rest] = url.split('/o/');
+       const [pathPart, queryPart] = rest.split('?');
+       const encodedPath = pathPart.split('/').join('%2F');
+       return `${baseUrl}/o/${encodedPath}?${queryPart || 'alt=media'}`;
+     } catch (e) {
+       return url;
+     }
+  }
+  return url;
+};
+
 export default function PremiumRentEquipment() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,6 +93,7 @@ export default function PremiumRentEquipment() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     fetchNearbyGear(true);
   }, []);
+  
   // Initial load
   useEffect(() => {
     fetchNearbyGear();
@@ -118,9 +140,9 @@ export default function PremiumRentEquipment() {
   };
 
   const renderItem = ({ item }: any) => {
-    // 🚀 SCALE OPTIMIZATION: Use the thumbnail path if it exists
-    // Fallback to the first original image if thumbnail isn't ready
-    const displayImage = item.media?.[0]?.replace('/originals/', '/thumbnails/') || item.media?.[0];
+    // 🛑 Uses the bulletproof fixer to extract the raw media, images, or imageUrls array.
+    const rawImage = item.media?.[0] || item.images?.[0] || item.imageUrls?.[0];
+    const displayImage = getValidImageUrl(rawImage);
 
     return (
       <TouchableOpacity 

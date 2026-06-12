@@ -177,7 +177,7 @@ export default function ActiveJobDetails() {
           </View>
         )}
 
-        {/* --- NEW: BOOKING DETAILS SECTION --- */}
+        {/* --- BOOKING DETAILS SECTION --- */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionLabel}>Booking Details</Text>
           
@@ -202,7 +202,7 @@ export default function ActiveJobDetails() {
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailTitle}>Current Status</Text>
               <Text style={[styles.detailDescription, { color: '#6366f1', fontWeight: 'bold', textTransform: 'capitalize' }]}>
-                {jobData?.status || "Unknown"}
+                {jobData?.status?.replace("_", " ") || "Unknown"}
               </Text>
             </View>
           </View>
@@ -229,15 +229,27 @@ export default function ActiveJobDetails() {
         </View>
 
         {/* --- PAYMENT CONFIRMATION MODULE --- */}
-        {/* Hide checkout button if job is already completed */}
-        {jobData?.status !== "completed" && (
+        
+        {/* State 1: Job is in progress, waiting for Pro to finish */}
+        {(jobData?.status === "assigned" || jobData?.status === "in_progress") && (
+          <View style={[styles.sectionCard, { alignItems: 'center' }]}>
+            <ActivityIndicator size="small" color="#6366f1" style={{ marginBottom: 10 }} />
+            <Text style={{ color: '#64748b', fontWeight: '600', textAlign: 'center', lineHeight: 20 }}>
+              Job is currently in progress. You will be prompted to pay once the professional completes the assignment.
+            </Text>
+          </View>
+        )}
+
+        {/* State 2: Pro requested payment */}
+        {jobData?.status === "payment_pending" && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionLabel}>Confirm Payment</Text>
             <TouchableOpacity
               style={styles.methodDropdown}
               onPress={() => {
                 if (!selectedMethod.isLinked) {
-                  // Optional: route to wallet setup
+                  Alert.alert("Wallet", "Redirecting to add card...");
+                  // Optional: router.push('/(customer)/wallet');
                 }
               }}
             >
@@ -262,6 +274,22 @@ export default function ActiveJobDetails() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* State 3: Payment Successful */}
+        {(jobData?.status === "paid" || jobData?.paymentStatus === "paid") && (
+          <View style={[styles.sectionCard, { backgroundColor: '#ecfdf5', borderColor: '#10b981' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+              <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 18, marginLeft: 8 }}>
+                Payment Successful
+              </Text>
+            </View>
+            <Text style={{ color: '#059669', textAlign: 'center', marginTop: 8, fontWeight: '500' }}>
+              Thank you! The professional has been compensated.
+            </Text>
+          </View>
+        )}
+
       </Animated.ScrollView>
     </View>
   );

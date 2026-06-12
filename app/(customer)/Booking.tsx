@@ -2,9 +2,8 @@ import { db } from "@/firebase/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { collection, doc, getDoc, query, serverTimestamp, where } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { SafeAreaView, Platform, StatusBar } from "react-native";
-import AddCardModal from "constants/AddCardModal"; // Create this file as discussed earlier
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useEffect, useState, useRef } from "react";
 import {
@@ -21,298 +20,90 @@ import { useAuth } from "../../context/AuthContext";
 import formatCurrency from "../../utils/currency";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
-const SUB_SERVICE_CONFIGS = {
+const SUB_SERVICE_CONFIGS: Record<string, any[]> = {
   // --- HAIR SERVICES ---
   "Braiding (Knotless)": [
-    {
-      key: "hair_length",
-      type: "select",
-      label: "Desired Length",
-      options: ["Shoulder", "Mid-back", "Waist", "Knee"],
-      icon: "ruler",
-    },
-    {
-      key: "braid_size",
-      type: "select",
-      label: "Braid Size",
-      options: ["Large", "Medium", "Small/Smedium"],
-      icon: "grid",
-    },
-    {
-      key: "provide_hair",
-      type: "toggle",
-      label: "Pro should provide hair extensions",
-      hint: "Pros usually charge an extra fee for purchasing hair.",
-    },
-    {
-      key: "hair_washed",
-      type: "toggle",
-      label: "Hair is already washed & blown out",
-      icon: "water",
-    },
+    { key: "hair_length", type: "select", label: "Desired Length", options: ["Shoulder", "Mid-back", "Waist", "Knee"], icon: "ruler" },
+    { key: "braid_size", type: "select", label: "Braid Size", options: ["Large", "Medium", "Small/Smedium"], icon: "grid" },
+    { key: "provide_hair", type: "toggle", label: "Pro should provide hair extensions", hint: "Pros usually charge an extra fee for purchasing hair." },
+    { key: "hair_washed", type: "toggle", label: "Hair is already washed & blown out", icon: "water" },
   ],
   "Hair Styling & Install": [
-    {
-      key: "service_type",
-      type: "select",
-      label: "Styling Type",
-      options: ["Wig Install", "Silk Press", "Pony Tail", "Wash & Set"],
-      icon: "content-cut",
-    },
-    {
-      key: "is_new_wig",
-      type: "toggle",
-      label: "New Wig? (Requires plucking/bleaching)",
-      icon: "sparkles",
-    },
-    {
-      key: "travel_setup",
-      type: "toggle",
-      label: "I have a chair and mirror ready",
-      hint: "Helps the pro know if they need to bring a portable chair.",
-    },
+    { key: "service_type", type: "select", label: "Styling Type", options: ["Wig Install", "Silk Press", "Pony Tail", "Wash & Set"], icon: "content-cut" },
+    { key: "is_new_wig", type: "toggle", label: "New Wig? (Requires plucking/bleaching)", icon: "sparkles" },
+    { key: "travel_setup", type: "toggle", label: "I have a chair and mirror ready", hint: "Helps the pro know if they need to bring a portable chair." },
   ],
 
   // --- BEAUTY SERVICES ---
   "Nail Tech (Full Set)": [
-    {
-      key: "set_type",
-      type: "select",
-      label: "Set Type",
-      options: ["Acrylic Full Set", "Gel Overlay", "Biab"],
-      icon: "hand-back-left",
-    },
-    {
-      key: "nail_art_count",
-      type: "counter",
-      label: "Nails with Art/Designs",
-      icon: "brush",
-    },
-    {
-      key: "needs_soak_off",
-      type: "toggle",
-      label: "I need a soak-off/removal",
-      hint: "Adds 30-45 mins to the appointment.",
-    },
-    {
-      key: "pedicure_add",
-      type: "toggle",
-      label: "Add basic pedicure?",
-      icon: "footsteps",
-    },
+    { key: "set_type", type: "select", label: "Set Type", options: ["Acrylic Full Set", "Gel Overlay", "Biab"], icon: "hand-back-left" },
+    { key: "nail_art_count", type: "counter", label: "Nails with Art/Designs", icon: "brush" },
+    { key: "needs_soak_off", type: "toggle", label: "I need a soak-off/removal", hint: "Adds 30-45 mins to the appointment." },
+    { key: "pedicure_add", type: "toggle", label: "Add basic pedicure?", icon: "footsteps" },
   ],
   "Makeup Artist (Glam)": [
-    {
-      key: "occasion",
-      type: "select",
-      label: "Occasion",
-      options: ["Soft Glam", "Full Bridal", "Editorial/Photoshoot"],
-      icon: "camera",
-    },
-    {
-      key: "lash_preference",
-      type: "select",
-      label: "Lashes",
-      options: ["Strip Lashes", "Individual Clusters", "No Lashes"],
-      icon: "eye",
-    },
-    {
-      key: "guest_count",
-      type: "counter",
-      label: "Additional people for makeup",
-      icon: "people",
-    },
+    { key: "occasion", type: "select", label: "Occasion", options: ["Soft Glam", "Full Bridal", "Editorial/Photoshoot"], icon: "camera" },
+    { key: "lash_preference", type: "select", label: "Lashes", options: ["Strip Lashes", "Individual Clusters", "No Lashes"], icon: "eye" },
+    { key: "guest_count", type: "counter", label: "Additional people for makeup", icon: "people" },
   ],
 
   // --- GROOMING ---
   "Mobile Barbering": [
-    {
-      key: "cut_type",
-      type: "select",
-      label: "Service",
-      options: [
-        "Haircut Only",
-        "Beard Trim/Lineup",
-        "Full Service (Hair & Beard)",
-      ],
-      icon: "content-cut",
-    },
-    {
-      key: "kids_count",
-      type: "counter",
-      label: "Number of Kids (under 12)",
-      icon: "person",
-    },
-    {
-      key: "senior_count",
-      type: "counter",
-      label: "Number of Seniors",
-      icon: "person-cane",
-    },
+    { key: "cut_type", type: "select", label: "Service", options: ["Haircut Only", "Beard Trim/Lineup", "Full Service (Hair & Beard)"], icon: "content-cut" },
+    { key: "kids_count", type: "counter", label: "Number of Kids (under 12)", icon: "person" },
+    { key: "senior_count", type: "counter", label: "Number of Seniors", icon: "person-cane" },
   ],
   "General/Basic Cleaning": [
-    {
-      key: "rooms_count",
-      type: "counter",
-      label: "Living Areas / Lounges",
-      icon: "sofa",
-    },
+    { key: "rooms_count", type: "counter", label: "Living Areas / Lounges", icon: "sofa" },
     { key: "bedrooms_count", type: "counter", label: "Bedrooms", icon: "bed" },
-    {
-      key: "bathrooms_count",
-      type: "counter",
-      label: "Bathrooms",
-      icon: "bath",
-    },
-    {
-      key: "provide_materials",
-      type: "toggle",
-      label: "I will provide cleaning materials",
-      hint: "Pros charge more if they bring their own.",
-    },
-    {
-      key: "has_pets",
-      type: "toggle",
-      label: "Has Pets? (Hair removal)",
-      icon: "dog",
-    },
+    { key: "bathrooms_count", type: "counter", label: "Bathrooms", icon: "bath" },
+    { key: "provide_materials", type: "toggle", label: "I will provide cleaning materials", hint: "Pros charge more if they bring their own." },
+    { key: "has_pets", type: "toggle", label: "Has Pets? (Hair removal)", icon: "dog" },
   ],
   "Spring Clean": [
     { key: "rooms_count", type: "counter", label: "Total Rooms", icon: "home" },
-    {
-      key: "inside_cupboards",
-      type: "toggle",
-      label: "Clean inside cupboards?",
-      icon: "archive",
-    },
-    {
-      key: "windows_count",
-      type: "counter",
-      label: "Interior Window Panes",
-      icon: "layout",
-    },
-    {
-      key: "is_move_out",
-      type: "toggle",
-      label: "Is this a Move-out / Move-in clean?",
-      hint: "Requires empty-house deep scrubbing.",
-    },
+    { key: "inside_cupboards", type: "toggle", label: "Clean inside cupboards?", icon: "archive" },
+    { key: "windows_count", type: "counter", label: "Interior Window Panes", icon: "layout" },
+    { key: "is_move_out", type: "toggle", label: "Is this a Move-out / Move-in clean?", hint: "Requires empty-house deep scrubbing." },
   ],
   "Oven Cleaning": [
-    {
-      key: "ovens_count",
-      type: "counter",
-      label: "Number of Ovens",
-      icon: "hash",
-    },
-    {
-      key: "is_gas",
-      type: "toggle",
-      label: "Is it a Gas Oven?",
-      icon: "flame",
-    },
-    {
-      key: "include_hob",
-      type: "toggle",
-      label: "Include Stove-top / Hob?",
-      icon: "disc",
-    },
+    { key: "ovens_count", type: "counter", label: "Number of Ovens", icon: "hash" },
+    { key: "is_gas", type: "toggle", label: "Is it a Gas Oven?", icon: "flame" },
+    { key: "include_hob", type: "toggle", label: "Include Stove-top / Hob?", icon: "disc" },
   ],
 
   "Leak Repair": [
-    {
-      key: "num_leaks",
-      type: "counter",
-      label: "Number of Leaks",
-      icon: "droplets",
-    },
-    {
-      key: "pipes_behind_wall",
-      type: "toggle",
-      label: "Pipes behind walls/under tiles?",
-      icon: "wall",
-    },
-    {
-      key: "is_emergency",
-      type: "toggle",
-      label: "Active Flooding / Emergency?",
-      icon: "alert-octagon",
-    },
-    {
-      key: "fixture_type",
-      type: "picker",
-      label: "Primary Fixture",
-      options: ["Tap", "Toilet", "Shower", "External Pipe"],
-    },
+    { key: "num_leaks", type: "counter", label: "Number of Leaks", icon: "droplets" },
+    { key: "pipes_behind_wall", type: "toggle", label: "Pipes behind walls/under tiles?", icon: "wall" },
+    { key: "is_emergency", type: "toggle", label: "Active Flooding / Emergency?", icon: "alert-octagon" },
+    { key: "fixture_type", type: "picker", label: "Primary Fixture", options: ["Tap", "Toilet", "Shower", "External Pipe"] },
   ],
   "Geyser Service": [
-    {
-      key: "geyser_age",
-      type: "counter",
-      label: "Approx Age of Geyser (Years)",
-      icon: "calendar",
-    },
-    {
-      key: "geyser_location",
-      type: "picker",
-      label: "Location",
-      options: ["Roof/Ceiling", "External Wall", "Garage"],
-    },
-    {
-      key: "is_solar",
-      type: "toggle",
-      label: "Solar Integrated System?",
-      icon: "sun",
-    },
-    {
-      key: "is_tripping",
-      type: "toggle",
-      label: "Tripping Electricity?",
-      icon: "zap",
-    },
+    { key: "geyser_age", type: "counter", label: "Approx Age of Geyser (Years)", icon: "calendar" },
+    { key: "geyser_location", type: "picker", label: "Location", options: ["Roof/Ceiling", "External Wall", "Garage"] },
+    { key: "is_solar", type: "toggle", label: "Solar Integrated System?", icon: "sun" },
+    { key: "is_tripping", type: "toggle", label: "Tripping Electricity?", icon: "zap" },
   ],
 
   // --- OUTDOOR CATEGORY ---
   "Gutter Cleaning": [
-    {
-      key: "floors_count",
-      type: "counter",
-      label: "Number of Stories",
-      icon: "layers",
-    },
-    {
-      key: "gutter_guards",
-      type: "toggle",
-      label: "Gutter guards installed?",
-      hint: "Takes longer to remove and replace.",
-    },
-    {
-      key: "is_accessible",
-      type: "toggle",
-      label: "Roof is walkable?",
-      icon: "check-circle",
-    },
-    {
-      key: "take_debris",
-      type: "toggle",
-      label: "Pro must bag and take away debris?",
-      icon: "trash-2",
-    },
+    { key: "floors_count", type: "counter", label: "Number of Stories", icon: "layers" },
+    { key: "gutter_guards", type: "toggle", label: "Gutter guards installed?", hint: "Takes longer to remove and replace." },
+    { key: "is_accessible", type: "toggle", label: "Roof is walkable?", icon: "check-circle" },
+    { key: "take_debris", type: "toggle", label: "Pro must bag and take away debris?", icon: "trash-2" },
   ],
 };
 
 export default function BookingScreen() {
-  const { user } = useAuth();
+  const { user, setActiveJobId } = useAuth();
   const router = useRouter();
   const googleAutocompleteRef = useRef<any>(null);
   const { categoryId, subServiceId } = useLocalSearchParams<{ categoryId: string; subServiceId: string }>();
-  const currentFields = SUB_SERVICE_CONFIGS[subServiceId as string] || [];
+  
   const [serviceDetails, setServiceDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState(1);
-  const { setActiveJobId } = useAuth();
   const [submitting, setSubmitting] = useState(false);
-  const [showPaymentSetup, setShowPaymentSetup] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({
     address: "",
     city: "",
@@ -379,83 +170,77 @@ export default function BookingScreen() {
     return Math.round(total * (multipliers[formData.urgency] || 1.0));
   };
 
-const handleSubmit = async () => {
-  if (!formData.address || !formData.city) {
-    Alert.alert("Missing Info", "Please provide a delivery address.");
-    return;
-  }
-
-  setSubmitting(true);
-  
-  try {
-    // 1. Fetch Fresh Customer Data for Handshake
-    const customerSnap = await getDoc(doc(db, "customers", user!.uid));
-    let handshakePin = "0000"; 
-    let customerName = "Tydee Customer";
-
-    if (customerSnap.exists()) {
-      const cData = customerSnap.data();
-      // EXACT SYNC: Match the logic from your ProfileScreen (permanentPin is priority)
-      handshakePin = String(cData.permanentPin || cData.startPin || "0000");
-      customerName = cData.full_name || user?.displayName || customerName;
+  const handleSubmit = async () => {
+    if (!formData.address || !formData.city) {
+      Alert.alert("Missing Info", "Please provide a delivery address and city.");
+      return;
     }
 
-    const calculatedBudget = calculateTotal();
-
-    // 2. Build Enhanced Payload
-    const jobPayload = {
-      title: serviceDetails?.name || "Service Request",
-      category: categoryId,
-      subService: subServiceId,
-      description: `${serviceDetails?.name} service at ${formData.address}`,
-      status: "pending",
-      bid_status: "open",
-      budget: calculatedBudget,
-      // EXPERT TIP: Set final_price initially to budget so the Invoice screen has a fallback
-      final_price: calculatedBudget, 
-      customerId: user!.uid,
-      displayName: customerName,
-      // CRITICAL: This PIN must match the one displayed in the Customer's ProfileScreen
-      startPin: handshakePin, 
-      location: { 
-        address: formData.address, 
-        city: formData.city,
-      },
-      details: {
-        urgency: formData.urgency,
-        scheduledDate: formData.scheduledDate || null,
-      },
-      propertyDetails: { ...formData },
-      bids: [],
-      bidders: [],
-      createdAt: serverTimestamp(),
-    };
-
-    // 3. Post to Firebase Cloud Function
-    const functions = getFunctions();
-    const createJobFn = httpsCallable(functions, "createJob");
+    setSubmitting(true);
     
-    const res: any = await createJobFn(jobPayload);
-    
-    if (res.data && res.data.jobId) {
-      const newJobId = res.data.jobId;
-      setActiveJobId(newJobId);
+    try {
+      const customerSnap = await getDoc(doc(db, "customers", user!.uid));
+      let handshakePin = "0000"; 
+      let customerName = "Tydee Customer";
 
-      router.replace({
-        pathname: "/(customer)/SelectBid/[jobId]",
-        params: { jobId: newJobId } 
-      });
-    } else {
-      throw new Error("Cloud Function did not return a Job ID.");
+      if (customerSnap.exists()) {
+        const cData = customerSnap.data();
+        handshakePin = String(cData.permanentPin || cData.startPin || "0000");
+        customerName = cData.full_name || user?.displayName || customerName;
+      }
+
+      const calculatedBudget = calculateTotal();
+
+      const jobPayload = {
+        title: serviceDetails?.name || "Service Request",
+        category: categoryId,
+        subService: subServiceId,
+        description: `${serviceDetails?.name} service at ${formData.address}`,
+        status: "pending",
+        bid_status: "open",
+        budget: calculatedBudget,
+        final_price: calculatedBudget, 
+        customerId: user!.uid,
+        displayName: customerName,
+        startPin: handshakePin, 
+        location: { 
+          address: formData.address, 
+          city: formData.city,
+        },
+        details: {
+          urgency: formData.urgency,
+          scheduledDate: formData.scheduledDate || null,
+        },
+        propertyDetails: { ...formData },
+        bids: [],
+        bidders: [],
+        createdAt: serverTimestamp(),
+      };
+
+      const functions = getFunctions();
+      const createJobFn = httpsCallable(functions, "createJob");
+      
+      const res: any = await createJobFn(jobPayload);
+      
+      if (res.data && res.data.jobId) {
+        const newJobId = res.data.jobId;
+        setActiveJobId(newJobId);
+
+        router.replace({
+          pathname: "/(customer)/SelectBid/[jobId]",
+          params: { jobId: newJobId } 
+        });
+      } else {
+        throw new Error("Cloud Function did not return a Job ID.");
+      }
+
+    } catch (e) {
+      console.error("Submit error:", e);
+      Alert.alert("Error", "Failed to post job. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-  } catch (e) {
-    console.error("Submit error:", e);
-    Alert.alert("Error", "Failed to post job. Please try again.");
-  } finally {
-    setSubmitting(false);
-  }
-};
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -511,30 +296,52 @@ const handleSubmit = async () => {
             <Animated.View entering={FadeInDown}>
               <Text style={styles.sectionLabel}>Service Location</Text>
               
-              <View style={[styles.autoCompleteContainer, { zIndex: 1000 }]}> 
-                <GooglePlacesAutocomplete
-                  ref={googleAutocompleteRef}
-                  placeholder='Search for address...'
-                  minLength={2}
-                  fetchDetails={true}
-                  onPress={(data, details = null) => {
-                    const city = details?.address_components.find(c => c.types.includes("locality"))?.long_name || "";
-                    setFormData({
-                      ...formData,
-                      address: data.description,
-                      city: city
-                    });
-                  }}
-                  query={{
-                    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-                    language: 'en',
-                    components: 'country:za', 
-                  }}
-                  styles={{
-                    textInput: styles.googleInput,
-                    listView: styles.googleListView,
-                  }}
-                />
+              {/* 🔥 WATERTIGHT FIX: Conditionally render Web Manual Inputs vs Native Autocomplete */}
+              <View style={{ zIndex: 1000 }}>
+                {Platform.OS === 'web' ? (
+                  <View style={{ marginBottom: 20 }}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Street Address (e.g., 123 Main St)"
+                      value={formData.address}
+                      onChangeText={(t) => setFormData({ ...formData, address: t })}
+                      placeholderTextColor="#94a3b8"
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="City (e.g., Durban)"
+                      value={formData.city}
+                      onChangeText={(t) => setFormData({ ...formData, city: t })}
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
+                ) : (
+                  <View style={[styles.autoCompleteContainer]}> 
+                    <GooglePlacesAutocomplete
+                      ref={googleAutocompleteRef}
+                      placeholder='Search for address...'
+                      minLength={2}
+                      fetchDetails={true}
+                      onPress={(data, details = null) => {
+                        const city = details?.address_components.find(c => c.types.includes("locality"))?.long_name || "";
+                        setFormData({
+                          ...formData,
+                          address: data.description,
+                          city: city
+                        });
+                      }}
+                      query={{
+                        apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+                        language: 'en',
+                        components: 'country:za', 
+                      }}
+                      styles={{
+                        textInput: styles.googleInput,
+                        listView: styles.googleListView,
+                      }}
+                    />
+                  </View>
+                )}
               </View>
 
               <Text style={styles.sectionLabel}>Urgency Level</Text>
@@ -562,7 +369,7 @@ const handleSubmit = async () => {
                 <Animated.View entering={FadeInDown} style={styles.card}>
                   <Text style={styles.fieldLabel}>Preferred Date</Text>
                   <TextInput 
-                    style={[styles.input, {marginTop: 10}]} 
+                    style={[styles.input, {marginTop: 10, marginBottom: 0}]} 
                     placeholder="YYYY-MM-DD" 
                     value={formData.scheduledDate}
                     onChangeText={t => setFormData({...formData, scheduledDate: t})}
@@ -638,7 +445,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 55,
   },
-  input: { backgroundColor: "#f9fafb", padding: 16, borderRadius: 12, borderWidth: 1, borderColor: "#e5e7eb", marginBottom: 12, fontSize: 15 },
+  input: { backgroundColor: "#fff", padding: 16, borderRadius: 12, borderWidth: 1, borderColor: "#e5e7eb", marginBottom: 12, fontSize: 15 },
   urgencyContainer: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   urgencyCard: { flex: 1, backgroundColor: '#fff', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center' },
   urgencyActive: { backgroundColor: '#4f46e5', borderColor: '#4f46e5' },

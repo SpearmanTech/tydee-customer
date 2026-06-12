@@ -34,7 +34,8 @@ export { generateThumbnail as onImageUpload } from "./equipments/onImageUpload";
 export { onNewChatMessage } from "./notifications/chatPush";
 // Pro Equipment Logic
 export { processReturn } from "./equipments/return";
-
+export { createRentalAndCharge } from "./payments/createRentalAndCharge";
+export { activateRentalHandshake } from "./payments/activateRentalHandshake";
 // Pro Job Logic
 export { syncCustomerPinToJobs } from "./jobs/startpin"; // Adjust "startJobPin" to match your actual export name
 

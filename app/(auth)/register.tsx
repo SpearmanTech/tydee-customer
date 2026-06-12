@@ -31,6 +31,7 @@ export default function RegisterScreen() {
 
   const isSignUp = mode === "signup";
 
+  
   const handleSubmit = async () => {
     if (!email.trim() || !password) {
       Alert.alert("Required", "Please enter both email and password.");
