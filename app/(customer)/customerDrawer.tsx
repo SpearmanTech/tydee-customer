@@ -70,7 +70,7 @@ export default function CustomerDrawer(props: DrawerContentComponentProps) {
         <DrawerItem
           icon={<Package size={20} color="#6366f1" />}
           label="Manage Rentals"
-          onPress={() => router.push("/(customer)/Rental-management/index")}
+          onPress={() => router.push("/(customer)/Rental-management")}
         />
         <DrawerItem
           icon={<BadgePlus size={20} color="#10b981" />}
