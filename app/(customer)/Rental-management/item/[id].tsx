@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, Camera, Save, Trash2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -12,10 +13,12 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
+  Image,
 } from "react-native";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "@/firebase/firebase"; // Ensure correct path
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import * as ImagePicker from "expo-image-picker";
+import { db, storage, auth } from "@/firebase/firebase"; // Ensure correct path
 
 export default function EditItemScreen() {
   const router = useRouter();
@@ -27,6 +30,7 @@ export default function EditItemScreen() {
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(false);
+  const [imageUri, setImageUri] = useState<string | null>(null);
   
   // Loading States
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -47,6 +51,11 @@ export default function EditItemScreen() {
           setPrice(item.pricing?.dailyRate?.toString() || "");
           setDescription(item.description || "");
           setIsActive(item.status === "active");
+          
+          // Load existing image if they have one
+          if (item.media && item.media.length > 0) {
+            setImageUri(item.media[0]);
+          }
         } else {
           Alert.alert("Not Found", "This equipment listing could not be found.");
           router.back();
@@ -62,7 +71,21 @@ export default function EditItemScreen() {
     fetchEquipment();
   }, [id]);
 
-  // 🚀 2. Save Changes back to Firestore
+  // 🚀 2. Image Picker Logic
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.6,
+    });
+
+    if (!result.canceled) {
+      setImageUri(result.assets[0].uri);
+    }
+  };
+
+  // 🚀 3. Save Changes back to Firestore & Storage
   const handleUpdate = async () => {
     if (!name || !price) {
       Alert.alert("Missing Info", "Please ensure the name and price are filled out.");
@@ -72,7 +95,19 @@ export default function EditItemScreen() {
     setIsSaving(true);
 
     try {
-      // Recalculate financial splits just like in new-listing
+      let downloadUrl = imageUri;
+      const user = auth.currentUser;
+
+      // Only upload to Storage if it's a NEW local file (doesn't start with http)
+      if (imageUri && !imageUri.startsWith("http") && user) {
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const fileRef = ref(storage, `equipment/${user.uid}/${Date.now()}.jpg`);
+        await uploadBytes(fileRef, blob);
+        downloadUrl = await getDownloadURL(fileRef);
+      }
+
+      // Recalculate financial splits
       const dailyRate = parseFloat(price);
       const tydeeFee = dailyRate * 0.15;
       const listerEarnings = dailyRate - tydeeFee;
@@ -86,8 +121,8 @@ export default function EditItemScreen() {
         "pricing.dailyRate": dailyRate,
         "pricing.listerEarnings": listerEarnings,
         "pricing.tydeeFee": tydeeFee,
-        // Optional: update security deposit if your logic requires it
         "pricing.securityDeposit": dailyRate * 5, 
+        media: downloadUrl ? [downloadUrl] : [],
       });
 
       Alert.alert(
@@ -103,7 +138,7 @@ export default function EditItemScreen() {
     }
   };
 
-  // 🚀 3. Delete Document
+  // 🚀 4. Delete Document
   const handleDelete = () => {
     Alert.alert(
       "Delete Listing",
@@ -155,11 +190,17 @@ export default function EditItemScreen() {
         
         {/* ── Image Edit Bay ── */}
         <View style={styles.imageEditContainer}>
-          <View style={styles.imagePlaceholder}>
-            <Camera size={32} color="#94a3b8" />
-          </View>
-          <TouchableOpacity style={styles.changeImageBtn}>
-            <Text style={styles.changeImageText}>Change Photo</Text>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Camera size={32} color="#94a3b8" />
+            </View>
+          )}
+          <TouchableOpacity style={styles.changeImageBtn} onPress={pickImage}>
+            <Text style={styles.changeImageText}>
+              {imageUri ? "Change Photo" : "Add Photo"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -261,6 +302,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 16,
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 24,
     marginBottom: 16,
   },
   changeImageBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: "#f8fafc", borderRadius: 12, borderWidth: 1, borderColor: "#e2e8f0" },
