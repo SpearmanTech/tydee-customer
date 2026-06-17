@@ -22,7 +22,9 @@ import React from "react";
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { mode = "signin" } = useLocalSearchParams<{ mode: "signin" | "signup" }>();
+  const { mode = "signin" } = useLocalSearchParams<{
+    mode: "signin" | "signup";
+  }>();
   const { signIn, signUp, promptGoogleAsync, googleRequest } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -31,7 +33,6 @@ export default function RegisterScreen() {
 
   const isSignUp = mode === "signup";
 
-  
   const handleSubmit = async () => {
     if (!email.trim() || !password) {
       Alert.alert("Required", "Please enter both email and password.");
@@ -54,9 +55,11 @@ export default function RegisterScreen() {
       router.replace("/");
     } catch (err: any) {
       let msg = "An unexpected error occurred.";
-      if (err.code === "auth/email-already-in-use") msg = "This email is already registered.";
+      if (err.code === "auth/email-already-in-use")
+        msg = "This email is already registered.";
       if (err.code === "auth/wrong-password") msg = "Incorrect password.";
-      if (err.code === "auth/user-not-found") msg = "No account found with this email.";
+      if (err.code === "auth/user-not-found")
+        msg = "No account found with this email.";
       Alert.alert("Failed", msg);
     } finally {
       setLoading(false);
@@ -68,7 +71,10 @@ export default function RegisterScreen() {
       await promptGoogleAsync();
       // Auth listener + provisioning in AuthContext handles the rest
     } catch (err) {
-      Alert.alert("Google Sign-In Failed", "Something went wrong. Please try again.");
+      Alert.alert(
+        "Google Sign-In Failed",
+        "Something went wrong. Please try again.",
+      );
     }
   };
 
@@ -80,7 +86,10 @@ export default function RegisterScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.inner} bounces={false}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
             <ArrowLeft size={24} color="#1e293b" />
           </TouchableOpacity>
 
@@ -90,7 +99,7 @@ export default function RegisterScreen() {
             </Text>
             <Text style={styles.subtitle}>
               {isSignUp
-                ? "Join Tydee to find top pros for your home."
+                ? "Join Foona to find top pros for your home."
                 : "Sign in to manage your bookings."}
             </Text>
           </Animated.View>
@@ -103,7 +112,9 @@ export default function RegisterScreen() {
             onPress={handleGoogleSignIn}
           >
             <Image
-              source={{ uri: "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" }}
+              source={{
+                uri: "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
+              }}
               style={styles.googleIcon}
             />
             <Text style={styles.googleBtnText}>
@@ -182,7 +193,7 @@ export default function RegisterScreen() {
               <Text style={styles.linkText}>
                 {isSignUp
                   ? "Already have an account? Sign in"
-                  : "New to Tydee? Create an account"}
+                  : "New to Foona? Create an account"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -205,7 +216,12 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: { fontSize: 32, fontWeight: "900", color: "#1e293b", marginBottom: 8 },
-  subtitle: { fontSize: 16, color: "#64748b", marginBottom: 28, fontWeight: "500" },
+  subtitle: {
+    fontSize: 16,
+    color: "#64748b",
+    marginBottom: 28,
+    fontWeight: "500",
+  },
 
   googleBtn: {
     flexDirection: "row",

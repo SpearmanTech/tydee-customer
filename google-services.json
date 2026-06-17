@@ -1,16 +1,16 @@
 {
   "project_info": {
     "project_number": "1054428007537",
-    "firebase_url": "https://tydee-afc49-default-rtdb.firebaseio.com",
-    "project_id": "tydee-afc49",
-    "storage_bucket": "tydee-afc49.firebasestorage.app"
+    "firebase_url": "https://Foona-afc49-default-rtdb.firebaseio.com",
+    "project_id": "Foona-afc49",
+    "storage_bucket": "Foona-afc49.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
         "mobilesdk_app_id": "1:1054428007537:android:45fb700e181104a425dfd0",
         "android_client_info": {
-          "package_name": "com.spearman.tydee"
+          "package_name": "com.spearman.Foona"
         }
       },
       "oauth_client": [
@@ -35,7 +35,7 @@
               "client_id": "1054428007537-3pafvc203v5m7hs8kcfeihkksa5fnvv8.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.tydeeinc.tydee"
+                "bundle_id": "com.Foonainc.Foona"
               }
             }
           ]

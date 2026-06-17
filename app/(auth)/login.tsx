@@ -31,18 +31,25 @@ export default function LoginScreen() {
       <View style={styles.content}>
         {/* BRANDING HERO */}
         <Animated.View entering={FadeInDown.duration(800)} style={styles.hero}>
-          <LinearGradient colors={["#6366f1", "#4f46e5"]} style={styles.logoBadge}>
+          <LinearGradient
+            colors={["#6366f1", "#4f46e5"]}
+            style={styles.logoBadge}
+          >
             <Sparkles color="#fff" size={32} />
           </LinearGradient>
-          <Text style={styles.brandName}>tydee</Text>
+          <Text style={styles.brandName}>Foona</Text>
           <Text style={styles.title}>Your home,{"\n"}reimagined.</Text>
           <Text style={styles.subtitle}>
-            Connect with top-rated professionals for cleaning, plumbing, and more.
+            Connect with top-rated professionals for cleaning, plumbing, and
+            more.
           </Text>
         </Animated.View>
 
         {/* ACTIONS */}
-        <Animated.View entering={FadeInDown.delay(200).duration(800)} style={styles.actions}>
+        <Animated.View
+          entering={FadeInDown.delay(200).duration(800)}
+          style={styles.actions}
+        >
           {/* Google Sign-In */}
           <TouchableOpacity
             style={styles.googleBtn}
@@ -51,7 +58,9 @@ export default function LoginScreen() {
             onPress={() => promptGoogleAsync()}
           >
             <Image
-              source={{ uri: "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" }}
+              source={{
+                uri: "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
+              }}
               style={styles.googleIcon}
             />
             <Text style={styles.googleBtnText}>Continue with Google</Text>
@@ -70,7 +79,10 @@ export default function LoginScreen() {
             activeOpacity={0.8}
             onPress={() => handleAction("signin")}
           >
-            <LinearGradient colors={["#1e293b", "#0f172a"]} style={styles.btnGradient}>
+            <LinearGradient
+              colors={["#1e293b", "#0f172a"]}
+              style={styles.btnGradient}
+            >
               <Text style={styles.primaryBtnText}>Sign In with Email</Text>
               <ChevronRight color="#fff" size={18} />
             </LinearGradient>
@@ -86,7 +98,9 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Secure booking for your peace of mind</Text>
+        <Text style={styles.footerText}>
+          Secure booking for your peace of mind
+        </Text>
       </View>
     </View>
   );

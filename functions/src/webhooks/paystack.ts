@@ -25,7 +25,6 @@ export const paystackWebhook = functions.https.onRequest(
 
     try {
       switch (event.event) {
-        
         // CUSTOMER CHARGE SUCCESSFUL -> NOW TRIGGER PRO PAYOUT
         case "charge.success":
           await handleSuccessfulChargeAndTriggerPayout(data);
@@ -48,7 +47,7 @@ export const paystackWebhook = functions.https.onRequest(
       console.error("Webhook Error:", error);
       res.status(500).send("Internal Error");
     }
-  }
+  },
 );
 
 /**
@@ -61,15 +60,19 @@ async function handleSuccessfulChargeAndTriggerPayout(data: any) {
 
   if (metadata?.jobId && metadata?.proId) {
     // 1. Update Job to 'paid'
-    await admin.firestore().collection('jobs').doc(metadata.jobId).update({
-      status: 'completed',
-      paymentStatus: 'paid',
+    await admin.firestore().collection("jobs").doc(metadata.jobId).update({
+      status: "completed",
+      paymentStatus: "paid",
       customerPaymentRef: reference,
-      paidAt: admin.firestore.FieldValue.serverTimestamp()
+      paidAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     // 2. Fetch Pro banking details (Recipient Code)
-    const proSnap = await admin.firestore().collection('professionals').doc(metadata.proId).get();
+    const proSnap = await admin
+      .firestore()
+      .collection("professionals")
+      .doc(metadata.proId)
+      .get();
     const proData = proSnap.data();
 
     if (!proData?.paystackRecipientCode) {
@@ -83,15 +86,15 @@ async function handleSuccessfulChargeAndTriggerPayout(data: any) {
     // 4. Initiate the Transfer
     try {
       await axios.post(
-        'https://api.paystack.co/transfer',
+        "https://api.paystack.co/transfer",
         {
           source: "balance",
           amount: proAmount,
           recipient: proData.paystackRecipientCode,
-          reason: `Payout for Tydee Job #${metadata.jobId}`,
-          reference: `payout_${metadata.jobId}_${Date.now()}`
+          reason: `Payout for Foona Job #${metadata.jobId}`,
+          reference: `payout_${metadata.jobId}_${Date.now()}`,
         },
-        { headers: { Authorization: `Bearer ${paystackSecret}` } }
+        { headers: { Authorization: `Bearer ${paystackSecret}` } },
       );
     } catch (err) {
       console.error("Failed to trigger automated payout:", err);
@@ -99,32 +102,35 @@ async function handleSuccessfulChargeAndTriggerPayout(data: any) {
   }
 }
 
-
 async function handleProPayoutSuccess(data: any) {
   const { reference, transfer_code } = data;
-  
+
   // Find the payout record using the reference
-  const payoutQuery = await admin.firestore().collection('payouts')
-    .where('reference', '==', reference).limit(1).get();
+  const payoutQuery = await admin
+    .firestore()
+    .collection("payouts")
+    .where("reference", "==", reference)
+    .limit(1)
+    .get();
 
   if (!payoutQuery.empty) {
     const payoutDoc = payoutQuery.docs[0];
     const { proId, jobId } = payoutDoc.data();
 
     await payoutDoc.ref.update({
-      status: 'completed',
+      status: "completed",
       transferCode: transfer_code,
-      completedAt: admin.firestore.FieldValue.serverTimestamp()
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    await admin.firestore().collection('jobs').doc(jobId).update({
-      status: 'finalized',
-      payoutStatus: 'disbursed'
+    await admin.firestore().collection("jobs").doc(jobId).update({
+      status: "finalized",
+      payoutStatus: "disbursed",
     });
 
     await sendPushNotification(proId, {
       title: "Funds Dispatched! 🇿🇦",
-      body: "Your payout has been processed and is on its way to your bank account."
+      body: "Your payout has been processed and is on its way to your bank account.",
     });
   }
 }
@@ -133,22 +139,26 @@ async function handleProPayoutSuccess(data: any) {
  * Handles failed transfers (e.g., incorrect bank details)
  */
 async function handleProPayoutFailure(data: any) {
-    const { reference, reason } = data;
-    const payoutQuery = await admin.firestore().collection('payouts')
-      .where('reference', '==', reference).limit(1).get();
-  
-    if (!payoutQuery.empty) {
-      const payoutDoc = payoutQuery.docs[0];
-      const { proId } = payoutDoc.data();
-  
-      await payoutDoc.ref.update({
-        status: 'failed',
-        failureReason: reason
-      });
-  
-      await sendPushNotification(proId, {
-        title: "Payout Issue ⚠️",
-        body: "There was an issue sending funds to your bank. Please check your banking details."
-      });
-    }
+  const { reference, reason } = data;
+  const payoutQuery = await admin
+    .firestore()
+    .collection("payouts")
+    .where("reference", "==", reference)
+    .limit(1)
+    .get();
+
+  if (!payoutQuery.empty) {
+    const payoutDoc = payoutQuery.docs[0];
+    const { proId } = payoutDoc.data();
+
+    await payoutDoc.ref.update({
+      status: "failed",
+      failureReason: reason,
+    });
+
+    await sendPushNotification(proId, {
+      title: "Payout Issue ⚠️",
+      body: "There was an issue sending funds to your bank. Please check your banking details.",
+    });
+  }
 }

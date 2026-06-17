@@ -10,7 +10,7 @@ export default function Header() {
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => navigation.navigate("Home" as never)}>
-        <Text style={styles.logo}>Tydee</Text>
+        <Text style={styles.logo}>Foona</Text>
       </TouchableOpacity>
 
       <View style={styles.right}>

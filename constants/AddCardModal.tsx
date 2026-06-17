@@ -1,13 +1,22 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View, Alert, Platform, TouchableOpacity } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  View,
+  Alert,
+  Platform,
+  TouchableOpacity,
+} from "react-native";
 import Constants from "expo-constants";
 // We only import the native wrapper for iOS/Android builds later
 import { Paystack } from "react-native-paystack-webview";
 
 const EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY: string =
   process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY ||
-  Constants.expoConfig?.extra?.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY || "";
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY ||
+  "";
 
 interface Props {
   userId: string | undefined;
@@ -21,9 +30,9 @@ const AddCardModal = ({ userId, email, onComplete }: Props) => {
 
   // 1. Inject Paystack's official Web SDK when running in a browser
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const script = document.createElement('script');
-      script.src = 'https://js.paystack.co/v1/inline.js';
+    if (Platform.OS === "web") {
+      const script = document.createElement("script");
+      script.src = "https://js.paystack.co/v1/inline.js";
       script.async = true;
       script.onload = () => setWebScriptLoaded(true);
       document.body.appendChild(script);
@@ -38,22 +47,25 @@ const AddCardModal = ({ userId, email, onComplete }: Props) => {
 
   // 2. Universal Success Handler (Works for both Web and Native)
   const handleSuccess = async (reference: string) => {
-    setIsProcessing(true); 
+    setIsProcessing(true);
     try {
       const functions = getFunctions();
-      const verifyCard = httpsCallable(functions, "verifyAndSaveCard"); 
-      
+      const verifyCard = httpsCallable(functions, "verifyAndSaveCard");
+
       await verifyCard({
         reference: reference,
         userId: userId,
       });
-      
+
       setIsProcessing(false);
       onComplete(true);
     } catch (error) {
       console.error("Card Verification Error:", error);
       setIsProcessing(false);
-      Alert.alert("Link Failed", "We couldn't securely verify your card. Please try again.");
+      Alert.alert(
+        "Link Failed",
+        "We couldn't securely verify your card. Please try again.",
+      );
       onComplete(false);
     }
   };
@@ -63,17 +75,21 @@ const AddCardModal = ({ userId, email, onComplete }: Props) => {
       <View style={styles.overlay}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4f46e5" />
-          <Text style={styles.loadingText}>Verifying with Tydee Servers...</Text>
+          <Text style={styles.loadingText}>
+            Verifying with Foona Servers...
+          </Text>
         </View>
       </View>
     );
   }
 
   // --- WEB RENDER ---
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     const triggerWebPaystack = () => {
       if (!webScriptLoaded || !(window as any).PaystackPop) {
-        alert("Secure payment system is loading. Please try again in a few seconds.");
+        alert(
+          "Secure payment system is loading. Please try again in a few seconds.",
+        );
         return;
       }
 
@@ -100,10 +116,13 @@ const AddCardModal = ({ userId, email, onComplete }: Props) => {
       <View style={styles.overlay}>
         <View style={styles.webContainer}>
           <Text style={styles.webTitle}>Secure Payment Setup</Text>
-          <Text style={styles.webSubtitle}>Click below to open Paystack's secure web portal and authorize your card.</Text>
-          
-          <TouchableOpacity 
-            style={[styles.webButton, !webScriptLoaded && { opacity: 0.5 }]} 
+          <Text style={styles.webSubtitle}>
+            Click below to open Paystack's secure web portal and authorize your
+            card.
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.webButton, !webScriptLoaded && { opacity: 0.5 }]}
             onPress={triggerWebPaystack}
             disabled={!webScriptLoaded}
           >
@@ -111,9 +130,12 @@ const AddCardModal = ({ userId, email, onComplete }: Props) => {
               {webScriptLoaded ? "Open Secure Portal" : "Loading Gateway..."}
             </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={{ marginTop: 20 }} onPress={() => onComplete(false)}>
-            <Text style={{ color: '#64748b', fontWeight: 'bold' }}>Cancel</Text>
+
+          <TouchableOpacity
+            style={{ marginTop: 20 }}
+            onPress={() => onComplete(false)}
+          >
+            <Text style={{ color: "#64748b", fontWeight: "bold" }}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -126,10 +148,10 @@ const AddCardModal = ({ userId, email, onComplete }: Props) => {
       <Paystack
         paystackKey={EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY}
         billingEmail={email}
-        amount="1.00" 
+        amount="1.00"
         currency="ZAR"
-        activityIndicatorColor="#4f46e5" 
-        autoStart={true} 
+        activityIndicatorColor="#4f46e5"
+        autoStart={true}
         onSuccess={(res: any) => handleSuccess(res.transactionRef.reference)}
         onCancel={() => onComplete(false)}
       />
@@ -140,7 +162,7 @@ const AddCardModal = ({ userId, email, onComplete }: Props) => {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10, 15, 30, 0.9)", 
+    backgroundColor: "rgba(10, 15, 30, 0.9)",
     zIndex: 9999,
     justifyContent: "center",
   },
@@ -156,41 +178,41 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   webContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     margin: 20,
     padding: 30,
     borderRadius: 24,
-    alignItems: 'center',
+    alignItems: "center",
     maxWidth: 400,
-    alignSelf: 'center',
-    width: '90%',
+    alignSelf: "center",
+    width: "90%",
   },
   webTitle: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#1e293b',
+    fontWeight: "800",
+    color: "#1e293b",
     marginBottom: 10,
   },
   webSubtitle: {
     fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
+    color: "#64748b",
+    textAlign: "center",
     marginBottom: 30,
     lineHeight: 20,
   },
   webButton: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: "#4f46e5",
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 16,
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
   },
   webButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
     fontSize: 16,
-  }
+  },
 });
 
 export default AddCardModal;
