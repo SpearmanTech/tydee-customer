@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { AppState } from "react-native"; // 👈 Added AppState
 import { useRouter, useSegments, useRootNavigationState } from "expo-router";
 import {
   onAuthStateChanged,
@@ -15,7 +16,6 @@ import { auth, db } from "@/firebase/firebase";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 
-// Required for OAuth redirect to complete properly on Android
 WebBrowser.maybeCompleteAuthSession();
 
 type Role = "customer";
@@ -38,47 +38,50 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🚀 DYNAMIC ENV VARIABLES WITH CRASH PREVENTION
-// ─────────────────────────────────────────────────────────────────────────────
 const GOOGLE_EXPO_CLIENT_ID    = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "missing-web-id";
 const GOOGLE_IOS_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || "missing-ios-id";
 const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || "missing-android-id";
 
-console.log("🚨 SENDING TO GOOGLE:", GOOGLE_EXPO_CLIENT_ID);
-
-// 🛡️ 1. The Gatekeeper Hook
+// 🛡️ 1. The Upgraded Gatekeeper Hook
 export function useProtectedRoute(user: any, role: string | null, loading: boolean) {
   const segments = useSegments();
   const router = useRouter();
-  const rootNavigationState = useRootNavigationState(); 
   
   useEffect(() => {
+    // Prevent routing decisions while Firebase is still loading
     if (loading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const isVerifyScreen = segments[1] === "verify-email";
 
     if (!user) {
-      if (!inAuthGroup || isVerifyScreen) {
-        router.replace("/(auth)/register");
+      if (!inAuthGroup) {
+        // Fallback directly to the login screen if they aren't authenticated
+        router.replace("/(auth)/login");
       }
-    } else if (user) {
-      const isEmailLogin = user.providerData?.some((p: any) => p.providerId === "password");
-      
-      if (isEmailLogin && !user.emailVerified) {
-        if (!isVerifyScreen) {
-          router.replace("/(auth)/verify-email");
-        }
-        return; 
-      }
+      return;
+    } 
 
-      if (inAuthGroup || segments.length === 0 || segments[0] === "index") {
-        if (role === "customer") {
-          router.replace("/(customer)");
-        }
+    const isEmailLogin = user.providerData?.some((p: any) => p.providerId === "password");
+    
+    // Trap them on the verify screen if email is unverified
+    if (isEmailLogin && !user.emailVerified) {
+      if (!isVerifyScreen) {
+        router.replace("/(auth)/verify-email");
+      }
+      return; 
+    }
+
+    // Wait for the role to load from Firestore before making final routing decisions.
+    // This stops the app from panicking and kicking them to the login screen early.
+    if (!role) return;
+
+    if (inAuthGroup || segments.length === 0 || segments[0] === "index") {
+      if (role === "customer") {
+        router.replace("/(customer)");
       }
     }
+    
   }, [user, role, loading, segments, router]);
 }
 
@@ -90,14 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [isOnboarded, setIsOnboarded] = useState(false);
 
-  // ── Google OAuth session ──────────────────────────────────────────────────
   const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
-   webClientId: GOOGLE_EXPO_CLIENT_ID, 
+    webClientId: GOOGLE_EXPO_CLIENT_ID, 
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
   });
 
-  // Handle the OAuth response when it arrives
   useEffect(() => {
     if (googleResponse?.type === "success") {
       const { id_token } = googleResponse.params;
@@ -108,7 +109,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [googleResponse]);
 
-  // ── Firebase Auth Listener ────────────────────────────────────────────────
+  // 🚀 FIXED: The "Magic Reload" for Email Verification
+  useEffect(() => {
+    // Listens for the user returning to the app from their Email client
+    const subscription = AppState.addEventListener("change", async (nextAppState) => {
+      if (nextAppState === "active" && auth.currentUser) {
+        // Force Firebase to grab the latest verification status from the server
+        await auth.currentUser.reload();
+        // Clone the user object to force React to trigger a state update and run the Gatekeeper
+        setUser({ ...auth.currentUser } as User);
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
@@ -144,7 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  // ── Auth Methods ──────────────────────────────────────────────────────────
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
@@ -179,11 +193,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signInWithGoogle = async () => {
-    // Intentionally empty, logic is handled by the googleResponse hook
-  };
+  const signInWithGoogle = async () => {};
 
-  // ── Firestore Auto-Provisioning for Google sign-ins ───────────────────────
   useEffect(() => {
     if (!user) return;
 
