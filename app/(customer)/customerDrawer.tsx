@@ -82,9 +82,8 @@ export default function CustomerDrawer(props: DrawerContentComponentProps) {
         <Text style={styles.sectionLabel}>EQUIPMENT HUB</Text>
         <DrawerItem
           icon={<Package size={20} color="#6366f1" />}
-          label="Rental Dashboard"
-          // 👇 Points to the new Customer location
-          onPress={() => router.push("/(customer)/Rental-management/index")}
+          label="Manage Rentals"
+          onPress={() => router.push("/(customer)/Rental-management")}
         />
         <DrawerItem
           icon={<BadgePlus size={20} color="#10b981" />}
