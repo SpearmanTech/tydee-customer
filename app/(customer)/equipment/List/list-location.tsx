@@ -5,7 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
 import { httpsCallable } from "firebase/functions";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,14 +21,26 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "../../../../components/Map";
 import { useAuth } from "../../../../context/AuthContext";
 
 const { width } = Dimensions.get("window");
-const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-// Fail loudly in dev so the env var issue is caught before shipping
-if (__DEV__ && !MAPBOX_TOKEN) {
+
+// 🚀 Google Places API (New) — web-first MVP, client-side, restricted key
+const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+if (__DEV__ && !GOOGLE_PLACES_API_KEY) {
   console.error(
-    "[list-location] EXPO_PUBLIC_MAPBOX_TOKEN is undefined. " +
+    "[list-location] EXPO_PUBLIC_GOOGLE_PLACES_API_KEY is undefined. " +
     "Address search will not work. Add it to your .env and restart Metro."
   );
 }
+
+const AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete";
+const GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
+
+type SelectedLocation = {
+  lat: number;
+  lng: number;
+  address: string;
+  placeId: string;
+};
 
 interface HandoverOptionProps {
   active: boolean;
@@ -71,6 +83,20 @@ function HandoverOption({
   );
 }
 
+// Generates a v4-style UUID for Places session tokens.
+// crypto.randomUUID() is available in all evergreen browsers (web target for this MVP).
+function generateSessionToken(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Fallback UUID v4 generator (only reached on environments without crypto.randomUUID)
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export default function ListStepFour() {
   const params = useLocalSearchParams();
   const { user } = useAuth();
@@ -78,52 +104,66 @@ export default function ListStepFour() {
   const [deliveryOption, setDeliveryOption] = useState<"pickup" | "both">("pickup");
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // 🚀 Mapbox & Location State
+  // 🚀 Google Places & Location State
+  const [location, setLocation] = useState<SelectedLocation | null>(null);
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isFetchingLocation, setIsFetchingLocation] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
-  // Default to Durban, updates when they search
-  const [location, setLocation] = useState({
-    lat: -29.8579,
-    lng: 31.0292,
-    address: "Umhlanga Rocks Dr, Durban",
-  });
+  // Session token lives for the duration of one search session (first keystroke -> selection).
+  // Reusing it across the autocomplete calls and the terminating geocode lookup is what
+  // makes this bill at the cheap per-request/session rate instead of per-keystroke.
+  const sessionTokenRef = useRef<string | null>(null);
 
-  // 🚀 Get user's current location on mount
+  const getSessionToken = () => {
+    if (!sessionTokenRef.current) {
+      sessionTokenRef.current = generateSessionToken();
+    }
+    return sessionTokenRef.current;
+  };
+
+  const retireSessionToken = () => {
+    sessionTokenRef.current = null;
+  };
+
   useEffect(() => {
     const getUserLocation = async () => {
       setIsFetchingLocation(true);
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Denied",
-          "Foona needs location access to set your gear's position. You can still search for it manually."
-        );
-        setIsFetchingLocation(false);
-        return;
-      }
+      setLocationError(null);
 
+      // On web, geolocation is opportunistic only — it's a convenience pre-fill,
+      // never a silent default. If it fails for any reason, we drop straight into
+      // the search UI with no placeholder address and no fallback coordinates.
       try {
-        let userLocation = await Location.getCurrentPositionAsync({});
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocationError("permission_denied");
+          setIsEditingLocation(true);
+          setIsFetchingLocation(false);
+          return;
+        }
+
+        const userLocation = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = userLocation.coords;
 
-        // Reverse geocode to get an address
-        const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${MAPBOX_TOKEN}&types=address`
-        );
-        const data = await response.json();
-        const address = data.features[0]?.place_name || "Current Location";
+        const resolved = await reverseGeocode(latitude, longitude);
+        if (!resolved) {
+          // Reverse geocode came back empty — do not default to "Current Location"
+          // or any hardcoded address. Force manual search instead.
+          setLocationError("reverse_geocode_empty");
+          setIsEditingLocation(true);
+          setIsFetchingLocation(false);
+          return;
+        }
 
-        setLocation({
-          lat: latitude,
-          lng: longitude,
-          address: address,
-        });
+        setLocation(resolved);
       } catch (error) {
         console.error("Error fetching initial location:", error);
+        setLocationError("geolocation_failed");
+        setIsEditingLocation(true);
       } finally {
         setIsFetchingLocation(false);
       }
@@ -132,7 +172,35 @@ export default function ListStepFour() {
     getUserLocation();
   }, []);
 
-  // 🚀 Mapbox Search Engine
+  // Resolves a lat/lng pair to a formatted address + place_id via the Geocoding API.
+  // Used only for the initial GPS pre-fill (no autocomplete session involved here).
+  const reverseGeocode = async (
+    latitude: number,
+    longitude: number
+  ): Promise<SelectedLocation | null> => {
+    try {
+      const url = `${GEOCODE_URL}?latlng=${latitude},${longitude}&key=${GOOGLE_PLACES_API_KEY}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status !== "OK" || !data.results?.length) {
+        return null;
+      }
+
+      const best = data.results[0];
+      return {
+        lat: latitude,
+        lng: longitude,
+        address: best.formatted_address,
+        placeId: best.place_id,
+      };
+    } catch (error) {
+      console.error("Reverse geocode error:", error);
+      return null;
+    }
+  };
+
+  // 🚀 Google Places Autocomplete (New) — as-you-type predictions
   const searchAddress = async (text: string) => {
     setSearchQuery(text);
 
@@ -144,33 +212,101 @@ export default function ListStepFour() {
     setIsSearching(true);
 
     try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-          text
-        )}.json?access_token=${MAPBOX_TOKEN}&autocomplete=true&country=za`
-      );
+      const response = await fetch(AUTOCOMPLETE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY as string,
+          // Only the fields we actually render in the dropdown — keeps this on the
+          // cheap end of the Autocomplete SKU and avoids pulling unused data.
+          "X-Goog-FieldMask":
+            "suggestions.placePrediction.placeId,suggestions.placePrediction.text.text,suggestions.placePrediction.structuredFormat",
+        },
+        body: JSON.stringify({
+          input: text,
+          sessionToken: getSessionToken(),
+          includedRegionCodes: ["za"],
+        }),
+      });
+
       const data = await response.json();
-      setSearchResults(data.features || []);
+
+      if (!response.ok) {
+        console.error("Places Autocomplete error:", data);
+        setSearchResults([]);
+        return;
+      }
+
+      const predictions = (data.suggestions || [])
+        .map((s: any) => s.placePrediction)
+        .filter(Boolean);
+
+      setSearchResults(predictions);
     } catch (error) {
-      console.error("Mapbox search error:", error);
+      console.error("Places Autocomplete request failed:", error);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleSelectLocation = (feature: any) => {
-    setLocation({
-      address: feature.place_name,
-      lng: feature.center[0],
-      lat: feature.center[1],
-    });
-    setSearchQuery("");
-    setSearchResults([]);
-    setIsEditingLocation(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  // Terminates the autocomplete session by resolving the chosen place via the
+  // Geocoding API (cheaper than Place Details (New) when only lat/lng/address is needed).
+  const handleSelectLocation = async (prediction: any) => {
+    const placeId = prediction.placeId;
+    const label =
+      prediction.text?.text ||
+      prediction.structuredFormat?.mainText?.text ||
+      "";
+
+    setIsSearching(true);
+    try {
+      const url = `${GEOCODE_URL}?place_id=${placeId}&key=${GOOGLE_PLACES_API_KEY}&sessiontoken=${getSessionToken()}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status !== "OK" || !data.results?.length) {
+        Alert.alert(
+          "Couldn't load that address",
+          "Please try selecting it again or search for a different address."
+        );
+        return;
+      }
+
+      const result = data.results[0];
+      const { lat, lng } = result.geometry.location;
+
+      setLocation({
+        lat,
+        lng,
+        address: result.formatted_address || label,
+        placeId: result.place_id || placeId,
+      });
+      setLocationError(null);
+      setSearchQuery("");
+      setSearchResults([]);
+      setIsEditingLocation(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error("Geocode lookup failed:", error);
+      Alert.alert("Error", "Could not resolve that address. Please try again.");
+    } finally {
+      setIsSearching(false);
+      // Session is done — selection made, geocode terminating call sent.
+      retireSessionToken();
+    }
   };
 
   const handlePublish = async () => {
+    if (!location) {
+      Alert.alert(
+        "Address required",
+        "Please search for and select a valid address before publishing."
+      );
+      setIsEditingLocation(true);
+      return;
+    }
+
     setIsPublishing(true);
     try {
       const publishListingFn = httpsCallable(functions, "publishListing");
@@ -182,9 +318,10 @@ export default function ListStepFour() {
         images: params.images ? JSON.parse(params.images as string) : [],
         dailyRate: params.dailyRate,
         deposit: params.deposit,
-        lat: location.lat, // 👈 Now completely dynamic
-        lng: location.lng, // 👈 Now completely dynamic
-        area: location.address, // 👈 Now completely dynamic
+        lat: location.lat,
+        lng: location.lng,
+        area: location.address,
+        placeId: location.placeId,
         handoverType: deliveryOption,
       });
 
@@ -199,6 +336,8 @@ export default function ListStepFour() {
       setIsPublishing(false);
     }
   };
+
+  const hasValidLocation = !!location;
 
   return (
     <View style={styles.container}>
@@ -234,8 +373,15 @@ export default function ListStepFour() {
               <Text style={styles.mapLoadingText}>Finding you...</Text>
             </View>
           )
-            : isEditingLocation ? (
+            : isEditingLocation || !hasValidLocation ? (
               <View style={styles.searchContainer}>
+                {locationError && (
+                  <Text style={styles.locationErrorText}>
+                    {locationError === "permission_denied"
+                      ? "Location access was denied. Search for your address below."
+                      : "We couldn't detect your location. Search for your address below."}
+                  </Text>
+                )}
                 <View style={styles.searchInputWrapper}>
                   <Ionicons name="search" size={20} color="#64748b" style={{ marginRight: 8 }} />
                   <TextInput
@@ -246,22 +392,24 @@ export default function ListStepFour() {
                     autoFocus
                   />
                   {isSearching && <ActivityIndicator size="small" color="#4f46e5" />}
-                  <TouchableOpacity onPress={() => setIsEditingLocation(false)}>
-                    <Ionicons name="close-circle" size={20} color="#94a3b8" />
-                  </TouchableOpacity>
+                  {hasValidLocation && (
+                    <TouchableOpacity onPress={() => setIsEditingLocation(false)}>
+                      <Ionicons name="close-circle" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {searchResults.length > 0 && (
                   <View style={styles.resultsList}>
                     {searchResults.map((item) => (
                       <TouchableOpacity
-                        key={item.id}
+                        key={item.placeId}
                         style={styles.resultItem}
                         onPress={() => handleSelectLocation(item)}
                       >
                         <Ionicons name="location-outline" size={18} color="#64748b" style={{ marginRight: 12 }} />
                         <Text style={styles.resultText} numberOfLines={2}>
-                          {item.place_name}
+                          {item.text?.text}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -291,7 +439,7 @@ export default function ListStepFour() {
               </View>
             )}
 
-          {!isEditingLocation && (
+          {!isEditingLocation && hasValidLocation && (
             <TouchableOpacity
               style={styles.locationInfo}
               onPress={() => setIsEditingLocation(true)}
@@ -348,10 +496,14 @@ export default function ListStepFour() {
         <TouchableOpacity
           style={styles.publishBtn}
           onPress={handlePublish}
-          disabled={isPublishing || isEditingLocation}
+          disabled={isPublishing || isEditingLocation || !hasValidLocation}
         >
           <LinearGradient
-            colors={isEditingLocation ? ["#94a3b8", "#cbd5e1"] : ["#0f172a", "#1e293b"]}
+            colors={
+              isEditingLocation || !hasValidLocation
+                ? ["#94a3b8", "#cbd5e1"]
+                : ["#0f172a", "#1e293b"]
+            }
             style={styles.gradient}
           >
             {isPublishing ? (
@@ -452,11 +604,19 @@ const styles = StyleSheet.create({
   },
   editText: { color: "#4f46e5", fontWeight: "800", fontSize: 13, paddingLeft: 10 },
 
-  // Mapbox Search Styles
+  // Search styles
   searchContainer: {
     padding: 16,
     backgroundColor: "#fff",
     minHeight: 180,
+  },
+  locationErrorText: {
+    fontSize: 12,
+    color: "#b45309",
+    backgroundColor: "#fffbeb",
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
   },
   searchInputWrapper: {
     flexDirection: "row",
