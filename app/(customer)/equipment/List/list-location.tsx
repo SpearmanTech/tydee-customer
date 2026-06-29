@@ -1,28 +1,34 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Dimensions,
-  Platform,
-  Alert,
-  ActivityIndicator,
-  TextInput,
-  FlatList,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
-import * as Haptics from "expo-haptics";
-import MapView, { Marker, PROVIDER_GOOGLE } from "../../../../components/Map";
-import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/firebase";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
+import { router, useLocalSearchParams } from "expo-router";
+import { httpsCallable } from "firebase/functions";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "../../../../components/Map";
 import { useAuth } from "../../../../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+// Fail loudly in dev so the env var issue is caught before shipping
+if (__DEV__ && !MAPBOX_TOKEN) {
+  console.error(
+    "[list-location] EXPO_PUBLIC_MAPBOX_TOKEN is undefined. " +
+    "Address search will not work. Add it to your .env and restart Metro."
+  );
+}
 
 interface HandoverOptionProps {
   active: boolean;
@@ -68,7 +74,7 @@ function HandoverOption({
 export default function ListStepFour() {
   const params = useLocalSearchParams();
   const { user } = useAuth();
-  
+
   const [deliveryOption, setDeliveryOption] = useState<"pickup" | "both">("pickup");
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -77,6 +83,7 @@ export default function ListStepFour() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(true);
 
   // Default to Durban, updates when they search
   const [location, setLocation] = useState({
@@ -84,6 +91,46 @@ export default function ListStepFour() {
     lng: 31.0292,
     address: "Umhlanga Rocks Dr, Durban",
   });
+
+  // 🚀 Get user's current location on mount
+  useEffect(() => {
+    const getUserLocation = async () => {
+      setIsFetchingLocation(true);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Foona needs location access to set your gear's position. You can still search for it manually."
+        );
+        setIsFetchingLocation(false);
+        return;
+      }
+
+      try {
+        let userLocation = await Location.getCurrentPositionAsync({});
+        const { latitude, longitude } = userLocation.coords;
+
+        // Reverse geocode to get an address
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${MAPBOX_TOKEN}&types=address`
+        );
+        const data = await response.json();
+        const address = data.features[0]?.place_name || "Current Location";
+
+        setLocation({
+          lat: latitude,
+          lng: longitude,
+          address: address,
+        });
+      } catch (error) {
+        console.error("Error fetching initial location:", error);
+      } finally {
+        setIsFetchingLocation(false);
+      }
+    };
+
+    getUserLocation();
+  }, []);
 
   // 🚀 Mapbox Search Engine
   const searchAddress = async (text: string) => {
@@ -181,66 +228,72 @@ export default function ListStepFour() {
 
         {/* LOCATION BAY (MAP OR SEARCH) */}
         <View style={styles.mapCard}>
-          {isEditingLocation ? (
-            <View style={styles.searchContainer}>
-              <View style={styles.searchInputWrapper}>
-                <Ionicons name="search" size={20} color="#64748b" style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search your address..."
-                  value={searchQuery}
-                  onChangeText={searchAddress}
-                  autoFocus
-                />
-                {isSearching && <ActivityIndicator size="small" color="#4f46e5" />}
-                <TouchableOpacity onPress={() => setIsEditingLocation(false)}>
-                  <Ionicons name="close-circle" size={20} color="#94a3b8" />
-                </TouchableOpacity>
-              </View>
-
-              {searchResults.length > 0 && (
-                <View style={styles.resultsList}>
-                  {searchResults.map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.resultItem}
-                      onPress={() => handleSelectLocation(item)}
-                    >
-                      <Ionicons name="location-outline" size={18} color="#64748b" style={{ marginRight: 12 }} />
-                      <Text style={styles.resultText} numberOfLines={2}>
-                        {item.place_name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+          {isFetchingLocation ? (
+            <View style={styles.mapLoadingContainer}>
+              <ActivityIndicator size="large" color="#4f46e5" />
+              <Text style={styles.mapLoadingText}>Finding you...</Text>
+            </View>
+          )
+            : isEditingLocation ? (
+              <View style={styles.searchContainer}>
+                <View style={styles.searchInputWrapper}>
+                  <Ionicons name="search" size={20} color="#64748b" style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search your address..."
+                    value={searchQuery}
+                    onChangeText={searchAddress}
+                    autoFocus
+                  />
+                  {isSearching && <ActivityIndicator size="small" color="#4f46e5" />}
+                  <TouchableOpacity onPress={() => setIsEditingLocation(false)}>
+                    <Ionicons name="close-circle" size={20} color="#94a3b8" />
+                  </TouchableOpacity>
                 </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.mapWrapper}>
-              <MapView
-                provider={PROVIDER_GOOGLE}
-                style={styles.map}
-                region={{
-                  latitude: location.lat,
-                  longitude: location.lng,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }}
-                scrollEnabled={false}
-                zoomEnabled={false}
-              >
-                <Marker coordinate={{ latitude: location.lat, longitude: location.lng }}>
-                  <View style={styles.customMarker}>
-                    <View style={styles.markerPulse} />
+
+                {searchResults.length > 0 && (
+                  <View style={styles.resultsList}>
+                    {searchResults.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.resultItem}
+                        onPress={() => handleSelectLocation(item)}
+                      >
+                        <Ionicons name="location-outline" size={18} color="#64748b" style={{ marginRight: 12 }} />
+                        <Text style={styles.resultText} numberOfLines={2}>
+                          {item.place_name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                </Marker>
-              </MapView>
-            </View>
-          )}
+                )}
+              </View>
+            ) : (
+              <View style={styles.mapWrapper}>
+                <MapView
+                  provider={PROVIDER_GOOGLE}
+                  style={styles.map}
+                  region={{
+                    latitude: location.lat,
+                    longitude: location.lng,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                >
+                  <Marker coordinate={{ latitude: location.lat, longitude: location.lng }}>
+                    <View style={styles.customMarker}>
+                      <View style={styles.markerPulse} />
+                    </View>
+                  </Marker>
+                </MapView>
+              </View>
+            )}
 
           {!isEditingLocation && (
-            <TouchableOpacity 
-              style={styles.locationInfo} 
+            <TouchableOpacity
+              style={styles.locationInfo}
               onPress={() => setIsEditingLocation(true)}
             >
               <Ionicons name="location-sharp" size={18} color="#4f46e5" />
@@ -360,6 +413,16 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.03,
     shadowRadius: 15,
+  },
+  mapLoadingContainer: {
+    height: 180,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  mapLoadingText: {
+    color: "#475569",
+    fontWeight: "600",
   },
   mapWrapper: { height: 180, width: "100%" },
   map: { ...StyleSheet.absoluteFillObject },
