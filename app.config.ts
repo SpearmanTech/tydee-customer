@@ -2,7 +2,7 @@ import { ExpoConfig } from "expo/config";
 
 const config: ExpoConfig = {
   name: "Foona",
-  slug: "Foona",
+  slug: "tydee",
   scheme: "Foona",
 
   platforms: ["ios", "android", "web"],

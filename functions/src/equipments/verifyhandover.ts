@@ -1,5 +1,5 @@
-import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as functions from "firebase-functions";
 import { HttpsError } from "firebase-functions/v2/https";
 
 export const verifyHandover = functions.https.onCall(async (request) => {
@@ -17,7 +17,7 @@ export const verifyHandover = functions.https.onCall(async (request) => {
   if (!rentalDoc.exists) {
     throw new HttpsError('not-found', 'Rental not found');
   }
-  
+
   const rentalData = rentalDoc.data()!;
 
   // 2. Permission Check: Only the owner (lister) can verify

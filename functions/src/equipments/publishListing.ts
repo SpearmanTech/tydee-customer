@@ -1,5 +1,5 @@
-import * as functions from "firebase-functions/v2";
 import * as admin from "firebase-admin";
+import * as functions from "firebase-functions/v2";
 import * as geofire from "geofire-common";
 
 export const publishListing = functions.https.onCall(async (request) => {
@@ -14,14 +14,47 @@ export const publishListing = functions.https.onCall(async (request) => {
 
   const db = admin.firestore();
 
+  // 📍 Address validation — no fallback coordinates.
+  // A listing with no real, geocoded address must not be allowed to publish.
+  const lat = parseFloat(data.lat);
+  const lng = parseFloat(data.lng);
+  const area = typeof data.area === "string" ? data.area.trim() : "";
+  const placeId = typeof data.placeId === "string" ? data.placeId.trim() : "";
+
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "A valid latitude is required. Please select an address from the search results.",
+    );
+  }
+
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "A valid longitude is required. Please select an address from the search results.",
+    );
+  }
+
+  if (!area) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "An address is required. Please select an address from the search results.",
+    );
+  }
+
+  if (!placeId) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Address must be selected from search results, not entered manually.",
+    );
+  }
+
   try {
     const dailyRate = parseFloat(data.dailyRate || "0");
     const deposit = parseFloat(data.deposit || "0");
     const FoonaFee = dailyRate * 0.15;
     const listerEarnings = dailyRate - FoonaFee;
 
-    const lat = parseFloat(data.lat || "-29.8579");
-    const lng = parseFloat(data.lng || "31.0292");
     const hash = geofire.geohashForLocation([lat, lng]);
 
     const listingData = {
@@ -41,7 +74,8 @@ export const publishListing = functions.https.onCall(async (request) => {
       lng: lng,
       location: {
         geopoint: new admin.firestore.GeoPoint(lat, lng),
-        area: data.area || "Durban",
+        area: area,
+        placeId: placeId,
         handoverType: data.handoverType || "pickup",
       },
       status: "active",
@@ -67,6 +101,11 @@ export const publishListing = functions.https.onCall(async (request) => {
     return { success: true, listingId: docRef.id };
   } catch (error) {
     console.error("PUBLISH_ERROR:", error);
+    // Don't mask deliberate HttpsErrors (e.g. validation) as generic internal errors —
+    // only wrap genuinely unexpected failures (DB writes, etc.).
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
     throw new functions.https.HttpsError("internal", "Database write failed.");
   }
 });

@@ -19,6 +19,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from "../../components/Header";
 import { useAuth } from "../../context/AuthContext";
+import React from "react";
 
 export default function ProfileScreen() {
   const { user, isLoading } = useAuth();

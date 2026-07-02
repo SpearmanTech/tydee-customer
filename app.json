@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Foona",
-    "slug": "Foona",
+    "slug": "tydee",
     "version": "1.0.0",
     "owner": "yasomwe",
     "orientation": "portrait",
@@ -40,6 +40,7 @@
       "expo-dev-client",
       "@react-native-firebase/app",
       "expo-router",
+      "@didit-protocol/sdk-react-native",
       [
         "expo-location",
         {
@@ -55,6 +56,7 @@
         }
       ]
     ],
+    
     "extra": {
       "EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY": "pk_live_099e1e221bc669f61ebc40349bbdb2ebb738a1bb",
       "eas": {
